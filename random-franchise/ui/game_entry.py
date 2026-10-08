@@ -31,6 +31,65 @@ def render(repo,f):
             opp=b.number_input('Opponent score',0,99,0)
             notes=st.text_area('Game notes')
 
+            opponent_quit = st.checkbox('Opponent quit / conceded')
+            if opponent_quit:
+                quit_inning = st.number_input(
+                    'Inning the opponent quit',
+                    min_value=1,
+                    max_value=30,
+                    value=2,
+                    step=1,
+                )
+
+                candidates = [
+                    repo.get('players', pid)
+                    for pid in run['roster_ids']
+                ]
+                candidates = [p for p in candidates if p]
+                names = {
+                    p['id']: p['name'] + ' · ' + p['version']
+                    for p in candidates
+                }
+                standout = st.selectbox(
+                    'Standout player',
+                    [None] + list(names),
+                    format_func=lambda pid: names.get(
+                        pid, 'Choose a player'
+                    ),
+                )
+
+                qualifies = (
+                    include
+                    and result == 'W'
+                    and own - opp >= 5
+                    and quit_inning <= 2
+                    and standout is not None
+                )
+
+                if qualifies:
+                    st.success(
+                        '🔥 Forced early quit! This performance qualifies '
+                        'for our proposed upgrade challenge.'
+                    )
+                else:
+                    st.caption(
+                        'Early-quit qualification requires Include scores, '
+                        'a win, a lead of 5+ runs, inning 1 or 2, '
+                        'and a standout player.'
+                    )
+
+                quit_note = (
+                    f"Opponent quit in inning {int(quit_inning)}."
+                )
+                if include:
+                    quit_note += f" Score: {int(own)}–{int(opp)}."
+                if standout:
+                    quit_note += f" Standout: {names[standout]}."
+                if qualifies:
+                    quit_note += ' Forced early quit qualification met.'
+
+                notes = (notes.strip() + '\n' + quit_note).strip()
+
             lines=stat_fields(repo,fid,run['roster_ids'],'entry:'+run['id'])
             st.caption('H means all hits, including doubles, triples, and home runs.')
 
