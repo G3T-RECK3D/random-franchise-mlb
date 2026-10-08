@@ -138,6 +138,65 @@ def resolve_move(repo, fid, mid, action, notes, target_id=None, new_player=None,
                 enqueue(f, 'front_office', m['id'])
                 f.update(state=State.WHEEL, return_state=State.MOVES)
                 repo.put('franchises', f)
+            elif m['type'] == 'upgrade':
+                from models.domain import POSITIONS, ACTIVE_AREAS
+                from services.roster_validator import legal_positions
+
+                if target_id and target_id != m.get('target'):
+                    raise RuleError('Use the player who earned this upgrade.')
+
+                p = repo.get('players', m.get('target'))
+                if not p or p['franchise_id'] != fid:
+                    raise RuleError('The upgrade player is unavailable.')
+                if p['area'] not in ACTIVE_AREAS:
+                    raise RuleError(
+                        'The player must be on the active roster. '
+                        'Defer the upgrade if they have been removed.'
+                    )
+                if not isinstance(new_player, dict):
+                    raise RuleError('Enter one upgraded card as a JSON object.')
+                if new_player.get('name', '').strip().casefold() != p['name'].strip().casefold():
+                    raise RuleError('The upgrade must be the same player.')
+                if new_player.get('kind') != p['kind']:
+                    raise RuleError('The upgraded card must have the same player type.')
+
+                ovr = new_player.get('ovr')
+                if type(ovr) is not int or not p['ovr'] < ovr <= 99:
+                    raise RuleError('The upgraded OVR must be higher, up to 99.')
+                if not str(new_player.get('version', '')).strip():
+                    raise RuleError('Enter the upgraded card version.')
+                if new_player.get('eligibility') != 'legal':
+                    raise RuleError('Confirm that the upgraded card is Event-legal.')
+
+                primary = new_player.get('primary')
+                secondary = new_player.get('secondary', [])
+                if (
+                    primary not in POSITIONS
+                    or not isinstance(secondary, list)
+                    or any(pos not in POSITIONS for pos in secondary)
+                ):
+                    raise RuleError('Enter valid primary and secondary positions.')
+
+                before_card = dict(p)
+                upgraded = dict(p)
+                for field in [
+                    'version', 'ovr', 'primary', 'secondary',
+                    'team', 'series', 'bat', 'throw', 'eligibility',
+                ]:
+                    if field in new_player:
+                        upgraded[field] = new_player[field]
+
+                if upgraded['position'] not in legal_positions(upgraded):
+                    raise RuleError(
+                        'The upgraded card cannot play the current assigned '
+                        'position. Arrange the player legally first.'
+                    )
+
+                repo.put('players', upgraded)
+                audit(
+                    repo, fid, 'development_card_upgrade',
+                    before_card, upgraded, notes, m['run_id'],
+                )
             elif m['type'] == 'acquire':
                 incoming = new_player if isinstance(new_player, list) else [new_player] if new_player else []
                 if len(incoming) != quantity:
