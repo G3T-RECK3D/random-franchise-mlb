@@ -95,6 +95,24 @@ def render(repo,f):
     st.subheader('Franchise status')
     table([{'Player':p['name'],'Status':badges(repo,fid,p)} for p in repo.list('players',fid) if badges(repo,fid,p)])
     show_challenges(repo, fid, run)
+    st.subheader('From the dugout')
+    recent = sorted(
+        [g for g in games if run and g['run_id'] == run['id']],
+        key=lambda g: g['number'],
+        reverse=True,
+    )[:5]
+
+    if not recent:
+        st.caption('Your first saved game will appear here.')
+
+    for game in recent:
+        with st.container(border=True):
+            outcome = 'WIN' if game['result'] == 'W' else 'LOSS'
+            st.write(f"Game {game['number']} · {outcome}")
+            if game.get('opponent'):
+                st.caption('Opponent: ' + game['opponent'])
+            if game.get('notes'):
+                st.write(game['notes'])
     st.subheader('📦 Next Run Moves')
     table([{'Move':m['description'],'Type':m['type'],'Status':m['status']} for m in pending[:8]])
     spins=repo.list('spins',fid)
