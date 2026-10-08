@@ -8,6 +8,7 @@ from ui.common import table,badges
 from ui.forms import player_fields
 
 def render(repo,f):
+    st.warning("SYNC TEST 246 — updated roster code is running")
     fid=f['id'];players=repo.list('players',fid)
     is_locked=locked(repo,fid)
     if is_locked:st.info('Active run: lineup, bench, positions, rotation, and bullpen arrangements are available. New cards, call-ups, and removals wait until offseason.')
