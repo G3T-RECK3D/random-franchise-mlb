@@ -71,12 +71,27 @@ def show_challenges(repo, fid, run):
 
 def render(repo,f):
     fid=f['id'];run=repo.get('runs',f['current_run']) if f['current_run'] else None
-    with st.container(border=True):
-        st.caption("FRANCHISE HEADQUARTERS")
-        st.header(f['name'])
-        st.write(f['event'])
-        if run:
-            st.caption(f"Run {run['number']} · Your next chapter")
+    import html
+
+    st.markdown(
+        '<div style="'
+        'background:linear-gradient(120deg,#990019,#171717);'
+        'border-left:6px solid #ff334f;'
+        'border-radius:14px;padding:28px;margin-bottom:20px;'
+        'color:white;">'
+        '<div style="font-size:12px;letter-spacing:3px;'
+        'font-weight:bold;color:#ffb3bf;">'
+        'FRANCHISE HEADQUARTERS</div>'
+        '<div style="font-size:34px;font-weight:bold;'
+        'margin:12px 0;">'
+        + html.escape(f['name'])
+        + '</div><div style="color:#eeeeee;">'
+        + html.escape(f['event'])
+        + '</div></div>',
+        unsafe_allow_html=True,
+    )
+    if run:
+        st.caption(f"Run {run['number']} · Your next chapter")
     games=repo.list('games',fid)
     run_games = sorted(
         [g for g in games if run and g['run_id'] == run['id']],
