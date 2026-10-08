@@ -13,7 +13,7 @@ def render(repo,f):
         return
     key='draft:'+run['id']
     if key not in st.session_state:
-        with st.container():
+        with st.form('game_entry'):
             a,b,c=st.columns(3)
             result=a.selectbox('Result',['W','L'])
             opponent=b.text_input('Opponent (optional)')
@@ -24,110 +24,25 @@ def render(repo,f):
             opp=b.number_input('Opponent score',0,99,0)
             notes=st.text_area('Game notes')
             lines=stat_fields(repo,fid,run['roster_ids'],'entry:'+run['id'])
-            from models.domain import RuleError
-            from services.stat_engine import validate_line
-
-            stat_errors = []
-            for row in lines:
-                player = repo.get('players', row['player_id'])
-                try:
-                    validate_line(player['kind'], row['line'])
-                except RuleError as exc:
-                    stat_errors.append(f"{player['name']}: {exc}")
-
-            for error in stat_errors:
-                st.error(error)
-            if st.button('Review game', type='primary', disabled=bool(stat_errors)):
+            if st.form_submit_button('Review game',type='primary'):
                 st.session_state[key]=dict(request_id=uid(),result=result,opponent=opponent,date=str(played),
                     team_score=int(own) if include else None,opponent_score=int(opp) if include else None,notes=notes,lines=lines)
                 st.rerun()
-        else:
-            import pandas as pd
-            from models.domain import RuleError
-            from services.stat_engine import validate_line
-
-            draft = st.session_state[key]
-            st.subheader('Review and edit before saving')
-            st.caption(
-                'Edit a number below, then press Enter or click outside its cell. '
-                'H means all hits, including doubles, triples, and home runs.'
-            )
-            st.write({
-                k: v for k, v in draft.items()
-                if k not in ['request_id', 'lines']
-            })
-            edited_lines = []
-            errors = []
-    
-            for row in draft['lines']:
-                player = repo.get('players', row['player_id'])
-                st.write(player['name'])
-                edited = st.data_editor(
-                    pd.DataFrame([row['line']]),
-                    key='review_stats:' + draft['request_id'] + ':' + row['player_id'],
-                    hide_index=True,
-                    width='stretch',
-                    num_rows='fixed',
-                    column_config={
-                        field: st.column_config.NumberColumn(
-                            'H · total hits' if field == 'h' else field,
-                            min_value=0,
-                            step=1,
-                        )
-                        for field in row['line']
-                    },
-                )
-                line = {
-                    field: None if pd.isna(value) else value
-                    for field, value in edited.to_dict('records')[0].items()
-                }
-                edited_lines.append(dict(row, line=line))
-    
-                try:
-                    validate_line(player['kind'], line)
-                except (RuleError, ValueError, OverflowError) as exc:
-                    details = ''
-                    if player['kind'] == 'hitter':
-                        details = (
-                            f" Entered: AB={line.get('ab', 0)}, H={line.get('h', 0)},"
-                            f" 2B={line.get('doubles', 0)}, 3B={line.get('triples', 0)},"
-                            f" HR={line.get('hr', 0)}."
-                        )
-                    errors.append(
-                        f"{player['name']}: {str(exc).rstrip('.')}.{details}"
-                    )
-    
-            draft['lines'] = edited_lines
-    
-            for error in errors:
-                st.error(error)
-            if errors:
-                st.info(
-                    'Your game has not been saved. Correct the player stats '
-                    'above; the other entries stay in place.'
-                )
-    
-            a, b = st.columns(2)
-            if a.button(
-                'Confirm and save once',
-                type='primary',
-                disabled=bool(errors),
-            ):
-                try:
-                    record_game(repo, fid, **dict(draft, lines=edited_lines))
-                except RuleError as exc:
-                    st.error(str(exc))
-                    st.info(
-                        'Nothing was saved. You can continue editing the stats above.'
-                    )
-                else:
-                    del st.session_state[key]
-                    st.session_state['last_saved_game'] = draft['request_id']
-                    st.rerun()
-
-        if b.button('Discard draft'):
+    else:
+        draft=st.session_state[key]
+        st.subheader('Review before saving')
+        st.write({k:v for k,v in draft.items() if k not in ['request_id','lines']})
+        st.write(f"{len(draft['lines'])} player stat lines")
+        for row in draft['lines']:
+            st.write(repo.get('players',row['player_id'])['name'],row['line'])
+        a,b=st.columns(2)
+        if a.button('Confirm and save once',type='primary'):
+            record_game(repo,fid,**draft)
             del st.session_state[key]
+            st.session_state['last_saved_game']=draft['request_id']
             st.rerun()
+        if b.button('Discard draft'):
+            del st.session_state[key];st.rerun()
     if st.session_state.get('last_saved_game'):
         st.success('Game saved. Your record and stats have been updated.')
         navigate('Return to dashboard','Dashboard')
