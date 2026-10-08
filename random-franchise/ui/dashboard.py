@@ -1,4 +1,3 @@
-import html
 import streamlit as st
 from models.domain import State
 from services.game_engine import start_run
@@ -70,27 +69,27 @@ def show_challenges(repo, fid, run):
                 st.info('Challenge completed. Choose a tag replacement in Banked Moves during offseason.')
 
 
-def headquarters_banner(f, run, run_games):
-    ordered = sorted(run_games, key=lambda g: g['number'])
-    streak = 0
-    last = ordered[-1]['result'] if ordered else None
-    for game in reversed(ordered):
-        if game['result'] != last:
-            break
-        streak += 1
-    streak_text = f"{streak}-game {'winning' if last == 'W' else 'losing'} streak" if last else 'A new chapter awaits'
-    phase = {
-        State.ACTIVE: 'IN SEASON', State.WHEEL: 'FRONT OFFICE DECISION',
-        State.SETUP: 'BUILD YOUR CLUB', State.READY: 'READY FOR OPENING DAY',
-    }.get(f['state'], 'OFFSEASON')
-    name = html.escape(f['name'])
-    event = html.escape(f.get('event', ''))
-    run_label = f"RUN {run['number']}" if run else 'PRESEASON'
-    st.markdown(f'''<style>
-    .franchise-banner {{background:linear-gradient(120deg,#780d21,#27131c 60%,#141923);
-      border:1px solid #823347;border-left:7px solid #e32946;border-radius:16px;
-      padding:28px;margin:8px 0 24px;color:#fff;}}
-    .franchise-banner .eyebrow {{font-size:12px;font-weight:700;letter-spacing:2px;color:#ffb9c5;}}
-    .franchise-banner h2 {{font-size:clamp(25px,4vw,42px);line-height:1.15;margin:12px 0;color:#fff;}}
-    .franchise-banner .event {{color:#e7d9df;font-size:15px;}}
-    .franchise-banner .story {{margin-top:20px;padding-top:15px;border-top:1px solid #ffffff25;font-size:16px;}}
+def render(repo,f):
+    fid=f['id'];run=repo.get('runs',f['current_run']) if f['current_run'] else None
+    games=repo.list('games',fid)
+    a,b,c,d=st.columns(4)
+    a.metric('Run record',f"{run['wins']}–{run['losses']}" if run else 'Not started')
+    b.metric('Franchise record',f"{sum(g['result']=='W' for g in games)}–{sum(g['result']=='L' for g in games)}")
+    pending=[m for m in repo.list('moves',fid) if m['status'] in ['pending','deferred']]
+    c.metric('📦 Next-run moves',len(pending))
+    threshold=next((n for n in sorted(int(x) for x in settings(repo,fid)['milestones']) if not run or n>run['wins']),None)
+    d.metric('Next milestone',f'{threshold} wins' if threshold else 'All earned')
+    if f['state']==State.ACTIVE:navigate('▶ Enter Next Game','Game Entry')
+    elif f['state']==State.WHEEL:navigate('🎡 Spin required wheel','Wheel Room')
+    elif f['state'] in [State.SETUP,State.READY]:
+        navigate('Build / inspect roster','Roster Manager')
+        if st.button('Validate and start next run',type='primary'):
+            start_run(repo,fid);st.rerun()
+    else:navigate('Continue offseason','Offseason')
+    st.subheader('Franchise status')
+    table([{'Player':p['name'],'Status':badges(repo,fid,p)} for p in repo.list('players',fid) if badges(repo,fid,p)])
+    show_challenges(repo, fid, run)
+    st.subheader('📦 Next Run Moves')
+    table([{'Move':m['description'],'Type':m['type'],'Status':m['status']} for m in pending[:8]])
+    spins=repo.list('spins',fid)
+    if spins:st.info('Latest wheel: '+spins[-1]['result']['text'])
