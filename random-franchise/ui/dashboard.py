@@ -110,13 +110,74 @@ def render(repo,f):
             st.success(f"🔥 On a roll: {streak}-game winning streak")
         else:
             st.info(f"⚾ Time to bounce back: {streak}-game losing streak")
-    a,b,c,d=st.columns(4)
-    a.metric('Run record',f"{run['wins']}–{run['losses']}" if run else 'Not started')
-    b.metric('Franchise record',f"{sum(g['result']=='W' for g in games)}–{sum(g['result']=='L' for g in games)}")
-    pending=[m for m in repo.list('moves',fid) if m['status'] in ['pending','deferred']]
-    c.metric('📦 Next-run moves',len(pending))
-    threshold=next((n for n in sorted(int(x) for x in settings(repo,fid)['milestones']) if not run or n>run['wins']),None)
-    d.metric('Next milestone',f'{threshold} wins' if threshold else 'All earned')
+    pending = [
+        m for m in repo.list('moves', fid)
+        if m['status'] in ['pending', 'deferred']
+    ]
+    threshold = next(
+        (
+            n for n in sorted(
+                int(x) for x in settings(repo, fid)['milestones']
+            )
+            if not run or n > run['wins']
+        ),
+        None,
+    )
+
+    def scoreboard_card(column, label, value, featured=False):
+        background = '#35101a' if featured else '#191c24'
+        with column:
+            st.markdown(
+                '<div style="'
+                f'background:{background};'
+                'border:1px solid #49303a;'
+                'border-top:4px solid #ff334f;'
+                'border-radius:12px;padding:18px;'
+                'min-height:130px;box-sizing:border-box;">'
+                '<div style="color:#c7c9d3;font-size:13px;'
+                'font-weight:600;margin-bottom:12px;">'
+                + label
+                + '</div>'
+                '<div style="color:white;font-size:34px;'
+                'font-weight:800;line-height:1.2;">'
+                + str(value)
+                + '</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    a, b, c, d = st.columns(4)
+    scoreboard_card(
+        a,
+        '⚾ RUN RECORD',
+        f"{run['wins']}–{run['losses']}" if run else '—',
+        featured=True,
+    )
+    scoreboard_card(
+        b,
+        '🏆 FRANCHISE RECORD',
+        f"{sum(g['result'] == 'W' for g in games)}–"
+        f"{sum(g['result'] == 'L' for g in games)}",
+    )
+    scoreboard_card(c, '📦 BANKED MOVES', len(pending))
+    scoreboard_card(
+        d,
+        '🎡 NEXT MILESTONE',
+        f'{threshold} wins' if threshold else 'All earned',
+    )
+
+    st.write('')
+    if run and threshold:
+        remaining = threshold - run['wins']
+        st.markdown(
+            f"**🎡 {remaining} more "
+            f"{'win' if remaining == 1 else 'wins'} "
+            "until your next milestone wheel**"
+        )
+        st.progress(
+            min(max(run['wins'] / threshold, 0.0), 1.0)
+        )
+    elif run:
+        st.caption('🏆 Every configured win milestone has been reached.')
     if f['state']==State.ACTIVE:navigate('▶ Enter Next Game','Game Entry')
     elif f['state']==State.WHEEL:navigate('🎡 Spin required wheel','Wheel Room')
     elif f['state'] in [State.SETUP,State.READY]:
