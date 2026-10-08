@@ -2,7 +2,7 @@ from models.domain import State, RuleError, uid, now, ACTIVE_AREAS
 from services.franchise_service import settings, audit
 from services.roster_validator import validate
 from services.stat_engine import validate_line
-from services.challenge_service import evaluate
+from services.challenge_service import evaluate, unlock_development
 from services.franchise_tag_service import grant
 
 
@@ -131,6 +131,7 @@ def record_game(repo, fid, request_id, result, lines=None, opponent='', team_sco
         milestone_sync(repo, f, run, request_id)
         _route(repo, f, run, game)
         evaluate(repo, fid, run['id'], request_id)
+        unlock_development(repo, fid, run['id'], request_id)
         return request_id
 
 
