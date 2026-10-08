@@ -83,6 +83,133 @@ def render(repo,f):
                                     int(row['Order']),
                                 )
                         st.rerun()
+    if is_locked:
+        with st.expander('Admin: correct starting roster'):
+            from models.domain import RuleError
+            from services.roster_validator import legal_positions
+
+            run = repo.get('runs', f['current_run'])
+            games = repo.list('games', fid, run['id'])
+
+            if games:
+                st.info('This correction is available only before the first saved game.')
+            else:
+                active = [
+                    p for p in players
+                    if p['area'] in ['lineup', 'bench', 'rotation', 'bullpen']
+                ]
+                minors = [p for p in players if p['area'] == 'minors']
+                choices = {p['id']: p for p in players}
+
+                if not active or not minors:
+                    st.info('You need an active player and a Minors player to swap.')
+                else:
+                    with st.form('correct_starting_roster'):
+                        outgoing_id = st.selectbox(
+                            'Incorrectly listed active player',
+                            [p['id'] for p in active],
+                            format_func=lambda pid: (
+                                choices[pid]['name'] + ' · ' + choices[pid]['area']
+                            ),
+                        )
+                        incoming_id = st.selectbox(
+                            'Player actually on your in-game roster',
+                            [p['id'] for p in minors],
+                            format_func=lambda pid: choices[pid]['name'],
+                        )
+                        reason = st.text_input('Correction reason')
+                        confirmed = st.checkbox(
+                            'This corrects the roster used when this run started.'
+                        )
+
+                        if st.form_submit_button('Apply starting-roster correction'):
+                            try:
+                                with repo.transaction():
+                                    current_f = repo.get('franchises', fid)
+                                    current_run = repo.get('runs', current_f['current_run'])
+                                    if current_run['id'] != run['id']:
+                                        raise RuleError('The current run changed. Reload this page.')
+                                    if current_run.get('ended_at') or repo.list('games', fid, run['id']):
+                                        raise RuleError('Only available before the first saved game.')
+                                    if not confirmed or not reason.strip():
+                                        raise RuleError('Enter a reason and confirm the correction.')
+
+                                    outgoing = repo.get('players', outgoing_id)
+                                    incoming = repo.get('players', incoming_id)
+                                    if (
+                                        outgoing['franchise_id'] != fid
+                                        or incoming['franchise_id'] != fid
+                                        or outgoing['area'] not in ['lineup', 'bench', 'rotation', 'bullpen']
+                                        or incoming['area'] != 'minors'
+                                        or outgoing_id not in current_run['roster_ids']
+                                        or incoming_id in current_run['roster_ids']
+                                    ):
+                                        raise RuleError('The selected roster assignments changed.')
+                                    if incoming['kind'] != outgoing['kind']:
+                                        raise RuleError('Both players must be the same type.')
+                                    if outgoing['position'] not in legal_positions(incoming):
+                                        raise RuleError('The incoming player cannot fill that position.')
+                                    if incoming.get('eligibility') != 'legal':
+                                        raise RuleError('Verify the incoming card is Event-legal first.')
+
+                                    references = [current_f.get('queue', [])]
+                                    for table_name in ['spins', 'moves', 'challenges']:
+                                        references.extend(repo.list(table_name, fid, run['id']))
+                                    if any(
+                                        outgoing_id in json.dumps(item)
+                                        or incoming_id in json.dumps(item)
+                                        for item in references
+                                    ):
+                                        raise RuleError('A current-run wheel or challenge references these players.')
+
+                                    if any(
+                                        prefix + run['id'] in st.session_state
+                                        for prefix in ['draft:', 'paste_import:']
+                                    ):
+                                        raise RuleError('Discard the unsaved game draft first.')
+
+                                    before = {
+                                        'outgoing': dict(outgoing),
+                                        'incoming': dict(incoming),
+                                        'roster_ids': list(current_run['roster_ids']),
+                                    }
+                                    assignment = (
+                                        outgoing['area'],
+                                        outgoing['position'],
+                                        outgoing['order'],
+                                    )
+                                    outgoing.update(
+                                        area='minors',
+                                        position=incoming['position'],
+                                        order=incoming['order'],
+                                    )
+                                    incoming.update(
+                                        area=assignment[0],
+                                        position=assignment[1],
+                                        order=assignment[2],
+                                    )
+                                    current_run['roster_ids'] = [
+                                        incoming_id if pid == outgoing_id else pid
+                                        for pid in current_run['roster_ids']
+                                    ]
+                                    repo.put('players', outgoing)
+                                    repo.put('players', incoming)
+                                    repo.put('runs', current_run)
+                                    audit(
+                                        repo, fid, 'starting_roster_correction',
+                                        before,
+                                        {
+                                            'outgoing': outgoing,
+                                            'incoming': incoming,
+                                            'roster_ids': current_run['roster_ids'],
+                                        },
+                                        reason.strip(),
+                                        run['id'],
+                                    )
+                            except RuleError as exc:
+                                st.error(str(exc))
+                            else:
+                                st.rerun()
     for area in AREAS:
         with st.expander(area.title(),expanded=area in ['lineup','bench']):
             table([{'Player':p['name'],'Card':p['version'],'OVR':p['ovr'],'Position':p['position'],'Order':p['order'],
