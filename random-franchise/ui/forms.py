@@ -48,6 +48,17 @@ def stat_fields(repo, fid, roster_ids, prefix, existing=None):
                 p['id'],
             )
         )
+        if kind == 'hitter':
+            st.info('BATTING ORDER TEST — updated forms.py is running')
+            st.write([
+                {
+                    'Player': p['name'],
+                    'Area': p['area'],
+                    'Saved order': p.get('order'),
+                }
+                for p in players
+            ])
+
         rows=[]
         for p in players:
             prior=old.get(p['id'],{})
