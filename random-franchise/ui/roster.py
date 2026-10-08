@@ -61,6 +61,65 @@ def render(repo,f):
         confirmed=st.checkbox('Import appends cards; I have checked for duplicates.')
         if upload and confirmed and st.button('Import cards'):
             import_roster(repo,fid,upload.getvalue().decode('utf-8-sig'),upload.name.rsplit('.',1)[-1]);st.rerun()
+    with st.expander('Delete accidental duplicate permanently'):
+        from models.domain import RuleError
+        import json
+
+        used_ids = {s['player_id'] for s in repo.list('stats', fid)}
+        duplicates = [
+            p for p in players
+            if p['area'] == 'dfa' and p['id'] not in used_ids
+        ]
+        if not duplicates:
+            st.info('No DFA players without saved stats are available to delete.')
+        else:
+            choices = {p['id']: p for p in duplicates}
+            duplicate_id = st.selectbox(
+                'Unused DFA entry to delete',
+                list(choices),
+                format_func=lambda pid: (
+                    f"{choices[pid]['name']} · {choices[pid]['version']} "
+                    f"· OVR {choices[pid]['ovr']} · ID {pid}"
+                ),
+                key='delete_duplicate_target',
+            )
+            confirmed = st.checkbox(
+                'This is an accidental duplicate. Permanently delete this entry.',
+                key='delete_duplicate_confirm',
+            )
+            if st.button('Delete unused duplicate', disabled=not confirmed):
+                try:
+                    with repo.transaction():
+                        player = repo.get('players', duplicate_id)
+                        if not player or player['franchise_id'] != fid or player['area'] != 'dfa':
+                            raise RuleError('Choose an unused DFA entry.')
+                        if any(s['player_id'] == duplicate_id for s in repo.list('stats', fid)):
+                            raise RuleError('This entry has saved stats and cannot be deleted.')
+                        runs = repo.list('runs', fid)
+                        if any(
+                            prefix + run['id'] in st.session_state
+                            for run in runs
+                            for prefix in ['draft:', 'paste_import:']
+                        ):
+                            raise RuleError('Finish or discard your unsaved game draft first.')
+                        if player.get('protected') or any(run.get('mvp') == duplicate_id for run in runs):
+                            raise RuleError('This entry is protected or has an MVP record.')
+                        references = [repo.get('franchises', fid).get('queue', [])]
+                        for table_name in ['tags', 'challenges', 'spins', 'moves', 'rewards', 'wheels']:
+                            references.extend(repo.list(table_name, fid))
+                        if any(duplicate_id in json.dumps(item) for item in references):
+                            raise RuleError('This entry is referenced by a wheel, tag, or challenge and cannot be deleted here.')
+                        for run in runs:
+                            if duplicate_id in run['roster_ids']:
+                                run['roster_ids'] = [pid for pid in run['roster_ids'] if pid != duplicate_id]
+                                repo.put('runs', run)
+                        audit(repo, fid, 'delete_unused_duplicate', player, None,
+                              'Permanently remove accidental DFA duplicate with no saved stats')
+                        repo.delete('players', duplicate_id)
+                except RuleError as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
     a,b=st.columns(2)
     a.download_button('Export roster JSON',export_roster(repo,fid),'roster.json','application/json')
     b.download_button('Export roster CSV',export_roster(repo,fid,'csv'),'roster.csv','text/csv')
