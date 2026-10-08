@@ -230,6 +230,48 @@ def render(repo,f):
                     )
     else:
         st.caption('Start a run to see your clubhouse leaders.')
+    with st.expander('🏆 All-Time Franchise Leaders', expanded=True):
+        st.caption(
+            'Saved stats across every run, including former players. '
+            'Tied players share the lead.'
+        )
+
+        franchise_totals = [
+            (p, aggregate(repo, fid, p))
+            for p in repo.list('players', fid)
+        ]
+
+        leader_columns = st.columns(3)
+        leader_categories = [
+            ('hitter', 'hr', 'Home runs'),
+            ('hitter', 'rbi', 'Runs batted in'),
+            ('pitcher', 'so', 'Strikeouts'),
+        ]
+
+        for column, (kind, field, label) in zip(
+            leader_columns, leader_categories
+        ):
+            candidates = [
+                (p['name'], totals.get(field, 0))
+                for p, totals in franchise_totals
+                if p['kind'] == kind
+            ]
+            best = max(
+                (value for name, value in candidates),
+                default=0,
+            )
+            leaders = [
+                name for name, value in candidates
+                if value == best and best > 0
+            ]
+
+            with column:
+                with st.container(border=True):
+                    st.metric(label, best)
+                    st.write(
+                        ', '.join(leaders)
+                        if leaders else 'No saved stats yet'
+                    )
     st.subheader('Franchise status')
     table([{'Player':p['name'],'Status':badges(repo,fid,p)} for p in repo.list('players',fid) if badges(repo,fid,p)])
     show_challenges(repo, fid, run)
