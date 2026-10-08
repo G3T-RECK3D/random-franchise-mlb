@@ -263,7 +263,6 @@ def render(repo,f):
             import_roster(repo,fid,upload.getvalue().decode('utf-8-sig'),upload.name.rsplit('.',1)[-1]);st.rerun()
     with st.expander('Delete accidental duplicate permanently'):
         from models.domain import RuleError
-        import json
 
         saved_stats = repo.list('stats', fid)
         used_ids = {s['player_id'] for s in saved_stats}
