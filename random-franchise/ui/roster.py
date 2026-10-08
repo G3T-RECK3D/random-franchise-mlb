@@ -90,7 +90,7 @@ def render(repo,f):
         ])
         duplicates = [
             p for p in players
-            if p['area'] == 'dfa' and p['id'] not in used_ids
+            if p['area'] in ['dfa', 'minors'] and p['id'] not in used_ids
         ]
         if not duplicates:
             st.info('No DFA players without saved stats are available to delete.')
@@ -113,8 +113,8 @@ def render(repo,f):
                 try:
                     with repo.transaction():
                         player = repo.get('players', duplicate_id)
-                        if not player or player['franchise_id'] != fid or player['area'] != 'dfa':
-                            raise RuleError('Choose an unused DFA entry.')
+                        if not player or player['franchise_id'] != fid or player['area'] not in ['dfa', 'minors']:
+                            raise RuleError('Choose an unused DFA or Minors entry.')
                         if any(s['player_id'] == duplicate_id for s in repo.list('stats', fid)):
                             raise RuleError('This entry has saved stats and cannot be deleted.')
                         runs = repo.list('runs', fid)
