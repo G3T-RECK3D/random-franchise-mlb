@@ -113,6 +113,79 @@ def render(repo,f):
                 st.caption('Opponent: ' + game['opponent'])
             if game.get('notes'):
                 st.write(game['notes'])
+    with st.expander('Edit saved game details'):
+        from services.franchise_service import audit
+
+        if not games:
+            st.info('No saved games yet.')
+        else:
+            game_labels = {
+                g['id']: (
+                    f"Run {repo.get('runs', g['run_id'])['number']} "
+                    f"· Game {g['number']} · {g['result']}"
+                )
+                for g in games
+            }
+            selected_id = st.selectbox(
+                'Choose a saved game',
+                list(game_labels),
+                format_func=game_labels.get,
+                key='game_details_target',
+            )
+            selected = repo.get('games', selected_id)
+
+            with st.form('game_details:' + selected_id):
+                opponent = st.text_input(
+                    'Opponent name',
+                    value=selected.get('opponent') or '',
+                )
+                include_scores = st.checkbox(
+                    'Include scores',
+                    value=selected.get('team_score') is not None,
+                )
+                a, b = st.columns(2)
+                own = a.number_input(
+                    'Your score', min_value=0,
+                    value=int(selected.get('team_score') or 0),
+                )
+                opp = b.number_input(
+                    'Opponent score', min_value=0,
+                    value=int(selected.get('opponent_score') or 0),
+                )
+                notes = st.text_area(
+                    'Game notes',
+                    value=selected.get('notes') or '',
+                )
+
+                if st.form_submit_button('Save game details'):
+                    with repo.transaction():
+                        current = repo.get('games', selected_id)
+                        scores_valid = (
+                            not include_scores
+                            or (
+                                own != opp
+                                and (own > opp) == (current['result'] == 'W')
+                            )
+                        )
+                        if not scores_valid:
+                            st.error('Scores must match the saved W/L result.')
+                        else:
+                            before = dict(current)
+                            current.update(
+                                opponent=opponent.strip(),
+                                team_score=int(own) if include_scores else None,
+                                opponent_score=int(opp) if include_scores else None,
+                                notes=notes,
+                            )
+                            repo.put('games', current)
+                            audit(
+                                repo, fid, 'edit_game_details',
+                                before, current,
+                                'Update opponent, scores, or game notes',
+                                current['run_id'],
+                            )
+                    if scores_valid:
+                        st.rerun()
     st.subheader('📦 Next Run Moves')
     table([{'Move':m['description'],'Type':m['type'],'Status':m['status']} for m in pending[:8]])
     spins=repo.list('spins',fid)
