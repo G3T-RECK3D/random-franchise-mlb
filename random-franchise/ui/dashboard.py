@@ -78,6 +78,23 @@ def render(repo,f):
         if run:
             st.caption(f"Run {run['number']} · Your next chapter")
     games=repo.list('games',fid)
+    run_games = sorted(
+        [g for g in games if run and g['run_id'] == run['id']],
+        key=lambda g: g['number'],
+    )
+
+    if run_games:
+        last_result = run_games[-1]['result']
+        streak = 0
+        for game in reversed(run_games):
+            if game['result'] != last_result:
+                break
+            streak += 1
+
+        if last_result == 'W':
+            st.success(f"🔥 On a roll: {streak}-game winning streak")
+        else:
+            st.info(f"⚾ Time to bounce back: {streak}-game losing streak")
     a,b,c,d=st.columns(4)
     a.metric('Run record',f"{run['wins']}–{run['losses']}" if run else 'Not started')
     b.metric('Franchise record',f"{sum(g['result']=='W' for g in games)}–{sum(g['result']=='L' for g in games)}")
