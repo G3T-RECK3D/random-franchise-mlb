@@ -62,7 +62,10 @@ def show_challenges(repo, fid, run):
                 scope = 'next qualifying game only' if challenge.get('scope') == 'next_game' else 'whole run'
                 target_run = repo.get('runs', challenge['run_id'])
                 st.caption(f"Run {target_run['number'] if target_run else '?'} · {scope}")
-            reward = 'Franchise Tag' if challenge.get('reward') == 'tag' else 'Player protection'
+            reward = {
+                'tag': 'Franchise Tag',
+                'upgrade': 'Next available same-player card upgrade',
+            }.get(challenge.get('reward'), 'Player protection')
             st.caption('Reward: ' + reward)
             pending_tag = repo.get('moves', 'challenge:' + challenge['id'])
             if status == 'passed' and pending_tag and pending_tag['status'] == 'pending':
