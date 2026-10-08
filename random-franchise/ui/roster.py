@@ -11,6 +11,78 @@ def render(repo,f):
     fid=f['id'];players=repo.list('players',fid)
     is_locked=locked(repo,fid)
     if is_locked:st.info('Active run: lineup, bench, positions, rotation, and bullpen arrangements are available. New cards, call-ups, and removals wait until offseason.')
+    with st.expander('⚾ Set batting order', expanded=False):
+        import pandas as pd
+
+        lineup = sorted(
+            [
+                p for p in players
+                if p['area'] == 'lineup' and p['kind'] == 'hitter'
+            ],
+            key=lambda p: (p['order'], p['name'], p['id']),
+        )
+
+        st.caption(
+            'Change the Order numbers, then save once. '
+            'Use each number from 1–9 exactly once. '
+            'Set your order before entering the next game’s stats.'
+        )
+
+        if len(lineup) != 9:
+            st.info('You need nine lineup hitters to set the batting order.')
+        else:
+            with st.form('set_batting_order'):
+                edited_order = st.data_editor(
+                    pd.DataFrame([
+                        {
+                            'player_id': p['id'],
+                            'Player': p['name'],
+                            'Position': p['position'],
+                            'Order': p['order'],
+                        }
+                        for p in lineup
+                    ]),
+                    hide_index=True,
+                    use_container_width=True,
+                    num_rows='fixed',
+                    disabled=['player_id', 'Player', 'Position'],
+                    column_config={
+                        'player_id': None,
+                        'Order': st.column_config.NumberColumn(
+                            'Order',
+                            min_value=1,
+                            max_value=9,
+                            step=1,
+                            required=True,
+                        ),
+                    },
+                    key='batting_order_editor',
+                )
+
+                if st.form_submit_button(
+                    'Save batting order',
+                    type='primary',
+                ):
+                    rows = edited_order.to_dict('records')
+                    orders = [row['Order'] for row in rows]
+
+                    if sorted(
+                        value for value in orders if pd.notna(value)
+                    ) != list(range(1, 10)):
+                        st.error('Use each batting-order number 1–9 exactly once.')
+                    else:
+                        with repo.transaction():
+                            for row in rows:
+                                player = repo.get('players', row['player_id'])
+                                arrange(
+                                    repo,
+                                    fid,
+                                    player['id'],
+                                    'lineup',
+                                    player['position'],
+                                    int(row['Order']),
+                                )
+                        st.rerun()
     for area in AREAS:
         with st.expander(area.title(),expanded=area in ['lineup','bench']):
             table([{'Player':p['name'],'Card':p['version'],'OVR':p['ovr'],'Position':p['position'],'Order':p['order'],
