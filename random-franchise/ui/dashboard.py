@@ -71,6 +71,12 @@ def show_challenges(repo, fid, run):
 
 def render(repo,f):
     fid=f['id'];run=repo.get('runs',f['current_run']) if f['current_run'] else None
+    with st.container(border=True):
+        st.caption("FRANCHISE HEADQUARTERS")
+        st.header(f['name'])
+        st.write(f['event'])
+        if run:
+            st.caption(f"Run {run['number']} · Your next chapter")
     games=repo.list('games',fid)
     a,b,c,d=st.columns(4)
     a.metric('Run record',f"{run['wins']}–{run['losses']}" if run else 'Not started')
