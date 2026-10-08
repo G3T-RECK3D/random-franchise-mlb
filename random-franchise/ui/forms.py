@@ -35,6 +35,19 @@ def stat_fields(repo, fid, roster_ids, prefix, existing=None):
     for kind,keys in [('hitter',HITTER),('pitcher',PITCHER)]:
         players=[repo.get('players',pid) for pid in roster_ids]
         players=[p for p in players if p and p['kind']==kind]
+        players.sort(
+            key=lambda p: (
+                {
+                    'lineup': 0,
+                    'bench': 1,
+                    'rotation': 0,
+                    'bullpen': 1,
+                }.get(p['area'], 2),
+                p.get('order', 99),
+                p['name'],
+                p['id'],
+            )
+        )
         rows=[]
         for p in players:
             prior=old.get(p['id'],{})
