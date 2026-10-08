@@ -178,7 +178,13 @@ def render(repo,f):
         )
     elif run:
         st.caption('🏆 Every configured win milestone has been reached.')
-    if f['state']==State.ACTIVE:navigate('▶ Enter Next Game','Game Entry')
+    if f['state'] == State.ACTIVE:
+        if st.button(
+            '⚾ ENTER NEXT GAME',
+            type='primary',
+            use_container_width=True,
+        ):
+            st.switch_page('pages/3_Game_Entry.py')
     elif f['state']==State.WHEEL:navigate('🎡 Spin required wheel','Wheel Room')
     elif f['state'] in [State.SETUP,State.READY]:
         navigate('Build / inspect roster','Roster Manager')
