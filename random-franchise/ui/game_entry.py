@@ -13,7 +13,7 @@ def render(repo,f):
         return
     key='draft:'+run['id']
     if key not in st.session_state:
-        with st.form('game_entry'):
+        with st.container():
             a,b,c=st.columns(3)
             result=a.selectbox('Result',['W','L'])
             opponent=b.text_input('Opponent (optional)')
@@ -24,7 +24,20 @@ def render(repo,f):
             opp=b.number_input('Opponent score',0,99,0)
             notes=st.text_area('Game notes')
             lines=stat_fields(repo,fid,run['roster_ids'],'entry:'+run['id'])
-            if st.form_submit_button('Review game',type='primary'):
+            from models.domain import RuleError
+            from services.stat_engine import validate_line
+
+            stat_errors = []
+            for row in lines:
+                player = repo.get('players', row['player_id'])
+                try:
+                    validate_line(player['kind'], row['line'])
+                except RuleError as exc:
+                    stat_errors.append(f"{player['name']}: {exc}")
+
+            for error in stat_errors:
+                st.error(error)
+            if st.button('Review game', type='primary', disabled=bool(stat_errors)):
                 st.session_state[key]=dict(request_id=uid(),result=result,opponent=opponent,date=str(played),
                     team_score=int(own) if include else None,opponent_score=int(opp) if include else None,notes=notes,lines=lines)
                 st.rerun()
