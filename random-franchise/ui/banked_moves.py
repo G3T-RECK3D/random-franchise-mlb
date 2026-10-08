@@ -32,17 +32,43 @@ def render(repo,f):
             eligible=[x for x in moves if x['run_id']==m['run_id'] and x['status']=='pending' and x['type'] in (['dfa'] if m['type']=='save_dfa' else ['dfa','demote','trade'])]
             cancel_id=st.selectbox('Consequence to cancel',[None]+[x['id'] for x in eligible],format_func=lambda i:next((x['description'] for x in eligible if x['id']==i),'Choose a consequence'))
         new=None
-        if m['type'] in ['acquire','trade']:
+        if m['type'] == 'upgrade':
+            player = repo.get('players', m['target'])
+            st.info(
+                'Upgrade ' + player['name']
+                + ' to the next available higher-rated Event-legal card. '
+                'Keep the name and player type unchanged; update the card details.'
+            )
+            template = {
+                field: player.get(field, '')
+                for field in [
+                    'name', 'version', 'ovr', 'primary', 'secondary',
+                    'kind', 'team', 'series', 'bat', 'throw', 'eligibility',
+                ]
+            }
+            incoming = st.text_area(
+                'Upgraded card JSON',
+                value=json.dumps(template, indent=2),
+                height=300,
+            )
+            next_card_confirmed = st.checkbox(
+                'I verified this is the next available higher-rated '
+                'Event-legal card of this player.'
+            )
+        elif m['type'] in ['acquire','trade']:
             st.caption('Enter incoming cards as JSON. Confirm the wheel’s external constraints yourself. Cards default to minors until arranged.')
             template=[dict(name='New Card',version='Base',ovr=80,primary='CF',secondary=['LF','RF'],kind='hitter',area='minors',position='CF',order=1,eligibility='legal')]
             incoming=st.text_area('Incoming card(s) JSON',value=json.dumps(template,indent=2),height=230)
         notes=st.text_area('Resolution notes / external-constraint verification')
         confirm=st.checkbox('I confirm the selected action, targets, and qualifying incoming cards.')
         if st.form_submit_button('Apply offseason resolution',type='primary'):
-            if m['type'] in ['acquire','trade'] and action=='resolved':
+            if m['type'] in ['acquire','trade','upgrade'] and action=='resolved':
+                if m['type'] == 'upgrade' and not next_card_confirmed:
+                    st.error('Confirm the next available legal card first.')
+                    return
                 try:
                     parsed=json.loads(incoming)
-                    new=parsed[0] if m['type']=='trade' and isinstance(parsed,list) and len(parsed)==1 else parsed
+                    new=parsed[0] if m['type'] in ['trade','upgrade'] and isinstance(parsed,list) and len(parsed)==1 else parsed
                 except (ValueError,IndexError):
                     st.error('Incoming JSON is invalid.');return
             resolve_move(repo,f['id'],mid,action,notes,target,new,replacement,confirm,cancel_id);st.rerun()
