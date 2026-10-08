@@ -46,7 +46,26 @@ def settle(repo, c, passed):
     previous = repo.get('rewards', key)
     # Re-evaluation does not repeat granted benefits. Corrections remain audited.
     if passed and not previous:
-        if c['reward'] == 'tag':
+        if c['reward'] == 'upgrade':
+            player = repo.get('players', c['player_id'])
+            repo.put('moves', dict(
+                id=key,
+                franchise_id=c['franchise_id'],
+                run_id=c['run_id'],
+                game_id=None,
+                type='upgrade',
+                target=c['player_id'],
+                description=(
+                    'Development upgrade: ' + player['name']
+                    + ' — next available higher-rated Event-legal card'
+                ),
+                constraints={},
+                status='pending',
+                critical=False,
+                created_at=now(),
+                source='development',
+            ))
+        elif c['reward'] == 'tag':
             result = grant(repo, c['franchise_id'], c['player_id'], source=c['description'])
             if result == 'cap_decision_required':
                 repo.put('moves', dict(id=key, franchise_id=c['franchise_id'], run_id=c['run_id'], game_id=None,
@@ -74,3 +93,88 @@ def confirm_manual(repo, fid, cid, passed, evidence):
         repo.put('challenges', c)
         settle(repo, c, passed)
         audit(repo, fid, 'challenge_evidence', before, c, evidence, c['run_id'])
+
+def unlock_development(repo, fid, run_id, game_id):
+    """Unlock one development challenge after a saved breakout game."""
+    challenges = repo.list('challenges', fid)
+    moves = repo.list('moves', fid)
+
+    for stat in repo.list('stats', fid, run_id):
+        if stat['game_id'] != game_id:
+            continue
+
+        player = repo.get('players', stat['player_id'])
+        if not player or player['ovr'] >= 99:
+            continue
+
+        line = stat['line']
+        if player['kind'] == 'hitter':
+            extra_base_hits = (
+                line['doubles'] + line['triples'] + line['hr']
+            )
+            breakout = (
+                line['hr'] >= 2
+                or (line['h'] >= 3 and extra_base_hits >= 1)
+            )
+            metric, threshold = 'hr', 3
+            goal = 'Hit 3 home runs next run'
+        else:
+            if line['starts']:
+                breakout = (
+                    line['outs'] >= 9
+                    and line['er'] == 0
+                    and line['so'] >= 4
+                )
+            else:
+                breakout = (
+                    line['outs'] >= 6
+                    and line['r'] == 0
+                    and line['so'] >= 3
+                )
+            metric, threshold = 'so', 8
+            goal = 'Record 8 strikeouts next run'
+
+        if not breakout:
+            continue
+
+        already_open = any(
+            c['player_id'] == player['id']
+            and c.get('reward') == 'upgrade'
+            and c['status'] in [
+                'waiting_next_run', 'active', 'awaiting_manual'
+            ]
+            for c in challenges
+        )
+        upgrade_waiting = any(
+            m.get('target') == player['id']
+            and m['type'] == 'upgrade'
+            and m['status'] in ['pending', 'deferred']
+            for m in moves
+        )
+        earned_this_run = any(
+            c['player_id'] == player['id']
+            and c.get('reward') == 'upgrade'
+            and c.get('breakout_run') == run_id
+            for c in challenges
+        )
+        if already_open or upgrade_waiting or earned_this_run:
+            continue
+
+        cid = create(
+            repo, fid, run_id, player['id'],
+            'Development: ' + goal
+            + ' to earn the next available higher-rated '
+            'Event-legal card of this player.',
+            metric=metric,
+            threshold=threshold,
+            scope='next_run',
+            reward='upgrade',
+            game_id=game_id,
+        )
+        challenge = repo.get('challenges', cid)
+        challenge.update(
+            breakout_run=run_id,
+            breakout_game=game_id,
+        )
+        repo.put('challenges', challenge)
+        challenges.append(challenge)
