@@ -86,7 +86,7 @@ def render(repo,f):
                 'Player ID': p['id'],
             }
             for p in players
-            if p['area'] == 'dfa'
+            if p['area'] in ['dfa', 'minors']
         ])
         duplicates = [
             p for p in players
