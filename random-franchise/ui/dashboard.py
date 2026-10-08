@@ -109,6 +109,42 @@ def render(repo,f):
         if st.button('Validate and start next run',type='primary'):
             start_run(repo,fid);st.rerun()
     else:navigate('Continue offseason','Offseason')
+    st.subheader('Clubhouse Leaders')
+    st.caption('Current-run stats · Tied players share the lead.')
+
+    if run:
+        player_totals = [
+            (p, aggregate(repo, fid, p, run['id']))
+            for p in repo.list('players', fid)
+        ]
+        columns = st.columns(3)
+        categories = [
+            ('hitter', 'hr', 'Home runs'),
+            ('hitter', 'rbi', 'Runs batted in'),
+            ('pitcher', 'so', 'Strikeouts'),
+        ]
+
+        for column, (kind, field, label) in zip(columns, categories):
+            candidates = [
+                (p['name'], totals.get(field, 0))
+                for p, totals in player_totals
+                if p['kind'] == kind
+            ]
+            best = max((value for name, value in candidates), default=0)
+            leaders = [
+                name for name, value in candidates
+                if value == best and best > 0
+            ]
+
+            with column:
+                with st.container(border=True):
+                    st.metric(label, best)
+                    st.write(
+                        ', '.join(leaders)
+                        if leaders else 'Waiting for the first mark'
+                    )
+    else:
+        st.caption('Start a run to see your clubhouse leaders.')
     st.subheader('Franchise status')
     table([{'Player':p['name'],'Status':badges(repo,fid,p)} for p in repo.list('players',fid) if badges(repo,fid,p)])
     show_challenges(repo, fid, run)
