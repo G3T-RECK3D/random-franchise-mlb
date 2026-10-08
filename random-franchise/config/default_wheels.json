@@ -1,0 +1,3106 @@
+[
+  {
+    "wheel_id": "front_office",
+    "display_name": "Front Office",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Upgrade Position",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "position",
+        "eligibility": {},
+        "description": "Upgrade Position"
+      },
+      {
+        "id": "w1",
+        "text": "Upgrade Worst Statistical Position",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Upgrade Worst Statistical Position"
+      },
+      {
+        "id": "w2",
+        "text": "Upgrade Lowest-OVR Position",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Upgrade Lowest-OVR Position"
+      },
+      {
+        "id": "w3",
+        "text": "Free Agent Signing",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Free Agent Signing"
+      },
+      {
+        "id": "w4",
+        "text": "MLB Team",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "team",
+        "eligibility": {},
+        "description": "MLB Team"
+      },
+      {
+        "id": "w5",
+        "text": "Division",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "division",
+        "eligibility": {},
+        "description": "Division"
+      },
+      {
+        "id": "w6",
+        "text": "Card Series",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "series",
+        "eligibility": {},
+        "description": "Card Series"
+      },
+      {
+        "id": "w7",
+        "text": "Random Card",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Random Card"
+      },
+      {
+        "id": "w8",
+        "text": "Random Hitter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Random Hitter"
+      },
+      {
+        "id": "w9",
+        "text": "Random Pitcher",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Random Pitcher"
+      },
+      {
+        "id": "w10",
+        "text": "Starting Pitcher Upgrade",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Starting Pitcher Upgrade"
+      },
+      {
+        "id": "w11",
+        "text": "Bullpen Upgrade",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Bullpen Upgrade"
+      },
+      {
+        "id": "w12",
+        "text": "Bench Upgrade",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Bench Upgrade"
+      },
+      {
+        "id": "w13",
+        "text": "Power Bat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Power Bat"
+      },
+      {
+        "id": "w14",
+        "text": "Contact Bat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Contact Bat"
+      },
+      {
+        "id": "w15",
+        "text": "Speedster",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Speedster"
+      },
+      {
+        "id": "w16",
+        "text": "Defensive Specialist",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Defensive Specialist"
+      },
+      {
+        "id": "w17",
+        "text": "Left-Handed Bat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Left-Handed Bat"
+      },
+      {
+        "id": "w18",
+        "text": "Right-Handed Bat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Right-Handed Bat"
+      },
+      {
+        "id": "w19",
+        "text": "Switch Hitter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Switch Hitter"
+      },
+      {
+        "id": "w20",
+        "text": "Captain-Eligible Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Captain-Eligible Player"
+      },
+      {
+        "id": "w21",
+        "text": "Legend",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Legend"
+      },
+      {
+        "id": "w22",
+        "text": "Current MLB Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Current MLB Player"
+      },
+      {
+        "id": "w23",
+        "text": "Young Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Young Player"
+      },
+      {
+        "id": "w24",
+        "text": "Veteran",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Veteran"
+      },
+      {
+        "id": "w25",
+        "text": "Same-Player Upgrade",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Same-Player Upgrade"
+      },
+      {
+        "id": "w26",
+        "text": "Opponent Raid",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Opponent Raid"
+      },
+      {
+        "id": "w27",
+        "text": "Trade Opportunity",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "trade",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Trade Opportunity"
+      },
+      {
+        "id": "w28",
+        "text": "Call-Up Opportunity",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "call_up",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Promote one existing minor-league card during offseason, then validate roster composition."
+      },
+      {
+        "id": "w29",
+        "text": "Fan Vote Signing",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Fan Vote Signing"
+      },
+      {
+        "id": "w30",
+        "text": "Budget Signing",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Budget Signing"
+      },
+      {
+        "id": "w31",
+        "text": "Position Battle Next Run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Position Battle Next Run"
+      },
+      {
+        "id": "w32",
+        "text": "Protect Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "protect",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Protect Player"
+      },
+      {
+        "id": "w33",
+        "text": "Franchise Tag Opportunity",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "tag_hitter",
+        "eligibility": {},
+        "description": "Franchise Tag Opportunity"
+      },
+      {
+        "id": "w34",
+        "text": "Bank Another Spin",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "extra_spin",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Bank Another Spin",
+        "quantity": 1
+      },
+      {
+        "id": "w35",
+        "text": "Double Front Office Spin",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "extra_spin",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Double Front Office Spin",
+        "quantity": 2
+      },
+      {
+        "id": "w36",
+        "text": "Premium Wheel",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "premium",
+        "eligibility": {},
+        "description": "Premium Wheel"
+      },
+      {
+        "id": "w37",
+        "text": "Jackpot Any Legal Card",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Jackpot Any Legal Card"
+      }
+    ]
+  },
+  {
+    "wheel_id": "position",
+    "display_name": "Position",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "C",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "C"
+      },
+      {
+        "id": "w1",
+        "text": "1B",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "1B"
+      },
+      {
+        "id": "w2",
+        "text": "2B",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "2B"
+      },
+      {
+        "id": "w3",
+        "text": "3B",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "3B"
+      },
+      {
+        "id": "w4",
+        "text": "SS",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "SS"
+      },
+      {
+        "id": "w5",
+        "text": "LF",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "LF"
+      },
+      {
+        "id": "w6",
+        "text": "CF",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "CF"
+      },
+      {
+        "id": "w7",
+        "text": "RF",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "RF"
+      },
+      {
+        "id": "w8",
+        "text": "DH",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "DH"
+      },
+      {
+        "id": "w9",
+        "text": "SP",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "SP"
+      },
+      {
+        "id": "w10",
+        "text": "RP",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "RP"
+      },
+      {
+        "id": "w11",
+        "text": "Bench",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Bench"
+      },
+      {
+        "id": "w12",
+        "text": "Any Infielder",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Infielder"
+      },
+      {
+        "id": "w13",
+        "text": "Any Outfielder",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Outfielder"
+      },
+      {
+        "id": "w14",
+        "text": "Any Hitter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Hitter"
+      },
+      {
+        "id": "w15",
+        "text": "Any Pitcher",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Pitcher"
+      },
+      {
+        "id": "w16",
+        "text": "Weakest OVR Position",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Weakest OVR Position"
+      },
+      {
+        "id": "w17",
+        "text": "Worst Statistical Position",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Worst Statistical Position"
+      },
+      {
+        "id": "w18",
+        "text": "Manager\u2019s Choice",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Manager\u2019s Choice"
+      }
+    ]
+  },
+  {
+    "wheel_id": "hot_seat",
+    "display_name": "First-Loss Hot Seat",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "No Punishment",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "No Punishment"
+      },
+      {
+        "id": "w1",
+        "text": "Lucky Escape",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Lucky Escape"
+      },
+      {
+        "id": "w2",
+        "text": "Bench Worst Hitter Next Game",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "kind": "hitter",
+          "needs_bench": true
+        },
+        "description": "Bench Worst Hitter Next Game \u2014 apply using existing active cards, verify legal positions, and confirm before continuing.",
+        "selector": "worst"
+      },
+      {
+        "id": "w3",
+        "text": "Bench Worst Hitter Rest of Run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "kind": "hitter",
+          "needs_bench": true
+        },
+        "description": "Bench Worst Hitter Rest of Run \u2014 apply using existing active cards, verify legal positions, and confirm before continuing.",
+        "selector": "worst"
+      },
+      {
+        "id": "w4",
+        "text": "Bench Random Starter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_bench": true
+        },
+        "description": "Bench Random Starter \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w5",
+        "text": "Bench Player Must Start",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_bench": true
+        },
+        "description": "Bench Player Must Start \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w6",
+        "text": "Lowest-OVR Bench Player Must Start",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_bench": true
+        },
+        "description": "Lowest-OVR Bench Player Must Start \u2014 apply using existing active cards, verify legal positions, and confirm before continuing.",
+        "selector": "lowest"
+      },
+      {
+        "id": "w7",
+        "text": "Random Legal Position Swap",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Random Legal Position Swap \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w8",
+        "text": "Move Worst Hitter to 9th",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "kind": "hitter"
+        },
+        "description": "Move Worst Hitter to 9th \u2014 apply using existing active cards, verify legal positions, and confirm before continuing.",
+        "selector": "worst"
+      },
+      {
+        "id": "w9",
+        "text": "Worst Hitter Leads Off",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "kind": "hitter"
+        },
+        "description": "Worst Hitter Leads Off \u2014 apply using existing active cards, verify legal positions, and confirm before continuing.",
+        "selector": "worst"
+      },
+      {
+        "id": "w10",
+        "text": "Best Hitter Bats 9th",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "kind": "hitter"
+        },
+        "description": "Best Hitter Bats 9th \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w11",
+        "text": "Randomize Batting Order",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Randomize Batting Order \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w12",
+        "text": "Change DH",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Change DH \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w13",
+        "text": "Change Closer",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Change Closer \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w14",
+        "text": "Worst Reliever Loses Role",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "kind": "pitcher"
+        },
+        "description": "Worst Reliever Loses Role \u2014 apply using existing active cards, verify legal positions, and confirm before continuing.",
+        "selector": "worst"
+      },
+      {
+        "id": "w15",
+        "text": "Random Reliever Becomes Closer",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "kind": "pitcher"
+        },
+        "description": "Random Reliever Becomes Closer \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w16",
+        "text": "Lowest-OVR Reliever Gets Next Save Chance",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "kind": "pitcher"
+        },
+        "description": "Lowest-OVR Reliever Gets Next Save Chance \u2014 apply using existing active cards, verify legal positions, and confirm before continuing.",
+        "selector": "lowest"
+      },
+      {
+        "id": "w17",
+        "text": "Worst Hitter Hot Seat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "hot_seat",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "Worst Hitter Hot Seat",
+        "selector": "worst"
+      },
+      {
+        "id": "w18",
+        "text": "Worst Pitcher Hot Seat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "hot_seat",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "Worst Pitcher Hot Seat",
+        "selector": "worst"
+      },
+      {
+        "id": "w19",
+        "text": "Random Starter Hot Seat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "hot_seat",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Random Starter Hot Seat"
+      },
+      {
+        "id": "w20",
+        "text": "Three Players Hot Seat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "hot_seat",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Three Players Hot Seat",
+        "quantity": 3
+      },
+      {
+        "id": "w21",
+        "text": "Lose Temporary Protection",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "unprotect",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_protection": true
+        },
+        "description": "Lose Temporary Protection"
+      },
+      {
+        "id": "w22",
+        "text": "Future DFA Candidate",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Future DFA Candidate"
+      },
+      {
+        "id": "w23",
+        "text": "Future Trade Candidate",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "trade",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Future Trade Candidate"
+      },
+      {
+        "id": "w24",
+        "text": "Future Demotion Candidate",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "demote",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Future Demotion Candidate"
+      },
+      {
+        "id": "w25",
+        "text": "Must Complete Survival Challenge",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "survival",
+        "eligibility": {},
+        "description": "Must Complete Survival Challenge"
+      },
+      {
+        "id": "w26",
+        "text": "Manager\u2019s Choice",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Manager\u2019s Choice \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w27",
+        "text": "Fan Vote",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "arrangement",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Fan Vote \u2014 apply using existing active cards, verify legal positions, and confirm before continuing."
+      },
+      {
+        "id": "w28",
+        "text": "Spin Twice",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "extra_spin",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Spin Twice",
+        "quantity": 2
+      }
+    ]
+  },
+  {
+    "wheel_id": "survival",
+    "display_name": "Survival Challenge",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Get a hit",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "Get a hit",
+        "metric": "h",
+        "threshold": 1,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w1",
+        "text": "Get 2 hits",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "Get 2 hits",
+        "metric": "h",
+        "threshold": 2,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w2",
+        "text": "Home run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "Home run",
+        "metric": "hr",
+        "threshold": 1,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w3",
+        "text": "RBI",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "RBI",
+        "metric": "rbi",
+        "threshold": 1,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w4",
+        "text": "Score a run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "Score a run",
+        "metric": "r",
+        "threshold": 1,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w5",
+        "text": "Steal a base",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "Steal a base",
+        "metric": "sb",
+        "threshold": 1,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w6",
+        "text": "2 strikeouts",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "2 strikeouts",
+        "metric": "so",
+        "threshold": 2,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w7",
+        "text": "3 strikeouts",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "3 strikeouts",
+        "metric": "so",
+        "threshold": 3,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w8",
+        "text": "Save",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "Save",
+        "metric": "sv",
+        "threshold": 1,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w9",
+        "text": "Hold",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "Hold",
+        "metric": "holds",
+        "threshold": 1,
+        "scope": "next_game",
+        "reward": "protection"
+      },
+      {
+        "id": "w10",
+        "text": "Retire 3 straight",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "Retire 3 straight",
+        "metric": null,
+        "threshold": 1,
+        "scope": "next_game",
+        "reward": "protection"
+      }
+    ]
+  },
+  {
+    "wheel_id": "elimination",
+    "display_name": "Second-Loss Elimination",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "DFA Worst Hitter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "DFA Worst Hitter",
+        "selector": "worst"
+      },
+      {
+        "id": "w1",
+        "text": "DFA Worst Pitcher",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "DFA Worst Pitcher",
+        "selector": "worst"
+      },
+      {
+        "id": "w2",
+        "text": "DFA Worst Overall",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "DFA Worst Overall",
+        "selector": "worst"
+      },
+      {
+        "id": "w3",
+        "text": "DFA Random Unprotected",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "DFA Random Unprotected"
+      },
+      {
+        "id": "w4",
+        "text": "DFA Lowest OVR",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "DFA Lowest OVR",
+        "selector": "lowest"
+      },
+      {
+        "id": "w5",
+        "text": "DFA Highest OVR Unprotected",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "DFA Highest OVR Unprotected",
+        "selector": "highest"
+      },
+      {
+        "id": "w6",
+        "text": "DFA Bottom-3 Spin",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "dfa_target",
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "DFA Bottom-3 Spin",
+        "selector": "bottom3"
+      },
+      {
+        "id": "w7",
+        "text": "DFA Hot Seat Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "hot_seat": true
+        },
+        "description": "DFA Hot Seat Player"
+      },
+      {
+        "id": "w8",
+        "text": "DFA Failed Challenge Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "failed_challenge": true
+        },
+        "description": "DFA Failed Challenge Player"
+      },
+      {
+        "id": "w9",
+        "text": "Demote Worst Hitter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "demote",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "Demote Worst Hitter",
+        "selector": "worst"
+      },
+      {
+        "id": "w10",
+        "text": "Demote Worst Pitcher",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "demote",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "Demote Worst Pitcher",
+        "selector": "worst"
+      },
+      {
+        "id": "w11",
+        "text": "Demote Random Starter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "demote",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "area": "lineup"
+        },
+        "description": "Demote Random Starter"
+      },
+      {
+        "id": "w12",
+        "text": "Demote Two",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "demote",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Demote Two",
+        "quantity": 2
+      },
+      {
+        "id": "w13",
+        "text": "Send Hot Seat Player to Minors",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "demote",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "hot_seat": true
+        },
+        "description": "Send Hot Seat Player to Minors"
+      },
+      {
+        "id": "w14",
+        "text": "Trade Worst Performer",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "trade",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Trade Worst Performer",
+        "selector": "worst"
+      },
+      {
+        "id": "w15",
+        "text": "Trade Random Starter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "trade",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "area": "lineup"
+        },
+        "description": "Trade Random Starter"
+      },
+      {
+        "id": "w16",
+        "text": "Trade Highest OVR Unprotected",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "trade",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Trade Highest OVR Unprotected",
+        "selector": "highest"
+      },
+      {
+        "id": "w17",
+        "text": "Forced Trade",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "trade",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Forced Trade"
+      },
+      {
+        "id": "w18",
+        "text": "Replace Starting Position",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Replace Starting Position \u2014 resolve manually during reconstruction; record the chosen cards and action in notes."
+      },
+      {
+        "id": "w19",
+        "text": "Replace Bench Spot",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Replace Bench Spot \u2014 resolve manually during reconstruction; record the chosen cards and action in notes."
+      },
+      {
+        "id": "w20",
+        "text": "Replace Rotation Spot",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Replace Rotation Spot \u2014 resolve manually during reconstruction; record the chosen cards and action in notes."
+      },
+      {
+        "id": "w21",
+        "text": "Replace Bullpen Spot",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Replace Bullpen Spot \u2014 resolve manually during reconstruction; record the chosen cards and action in notes."
+      },
+      {
+        "id": "w22",
+        "text": "Re-randomize Position",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Re-randomize Position \u2014 resolve manually during reconstruction; record the chosen cards and action in notes."
+      },
+      {
+        "id": "w23",
+        "text": "Entire Bench Review",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Entire Bench Review \u2014 resolve manually during reconstruction; record the chosen cards and action in notes."
+      },
+      {
+        "id": "w24",
+        "text": "Rotation Review",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Rotation Review \u2014 resolve manually during reconstruction; record the chosen cards and action in notes."
+      },
+      {
+        "id": "w25",
+        "text": "Bullpen Review",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Bullpen Review \u2014 resolve manually during reconstruction; record the chosen cards and action in notes."
+      },
+      {
+        "id": "w26",
+        "text": "No Punishment",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "No Punishment"
+      },
+      {
+        "id": "w27",
+        "text": "Run MVP Saves Team",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Run MVP Saves Team"
+      },
+      {
+        "id": "w28",
+        "text": "Fan Favorite Saves Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Fan Favorite Saves Player"
+      },
+      {
+        "id": "w29",
+        "text": "Call-Up Instead",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "call_up",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Promote one existing minor-league card during offseason, then validate roster composition."
+      },
+      {
+        "id": "w30",
+        "text": "Free Front Office Spin",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "front_office",
+        "eligibility": {},
+        "description": "Free Front Office Spin"
+      },
+      {
+        "id": "w31",
+        "text": "Two DFAs",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Two DFAs",
+        "quantity": 2
+      },
+      {
+        "id": "w32",
+        "text": "DFA + Demotion",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Apply one DFA and one demotion to unprotected players in Roster Manager, then record both targets here."
+      },
+      {
+        "id": "w33",
+        "text": "Spin Twice",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "extra_spin",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Spin Twice",
+        "quantity": 2
+      },
+      {
+        "id": "w34",
+        "text": "Crisis Wheel",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "meltdown",
+        "eligibility": {},
+        "description": "Crisis Wheel"
+      }
+    ]
+  },
+  {
+    "wheel_id": "dfa_target",
+    "display_name": "DFA Target (eligible bottom three)",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Eligible player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Eligible player"
+      }
+    ]
+  },
+  {
+    "wheel_id": "mvp",
+    "display_name": "Run MVP Reward",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Temporary protection",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "protect",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Temporary protection"
+      },
+      {
+        "id": "w1",
+        "text": "Franchise Tag hitter challenge",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "tag_hitter",
+        "eligibility": {
+          "kind": "hitter"
+        },
+        "description": "Franchise Tag hitter challenge"
+      },
+      {
+        "id": "w2",
+        "text": "Franchise Tag pitcher challenge",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "tag_pitcher",
+        "eligibility": {
+          "kind": "pitcher"
+        },
+        "description": "Franchise Tag pitcher challenge"
+      },
+      {
+        "id": "w3",
+        "text": "Front Office reward",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "front_office",
+        "eligibility": {},
+        "description": "Front Office reward"
+      }
+    ]
+  },
+  {
+    "wheel_id": "tag_hitter",
+    "display_name": "Franchise Tag Hitter Challenge",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "5 hits next run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "5 hits next run",
+        "metric": "h",
+        "threshold": 5,
+        "scope": "next_run",
+        "reward": "tag"
+      },
+      {
+        "id": "w1",
+        "text": "2 HR next run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "2 HR next run",
+        "metric": "hr",
+        "threshold": 2,
+        "scope": "next_run",
+        "reward": "tag"
+      },
+      {
+        "id": "w2",
+        "text": "5 RBI next run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "5 RBI next run",
+        "metric": "rbi",
+        "threshold": 5,
+        "scope": "next_run",
+        "reward": "tag"
+      },
+      {
+        "id": "w3",
+        "text": "Golden Ticket immediate tag",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "tag",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "hitter"
+        },
+        "description": "Golden Ticket immediate tag",
+        "metric": null,
+        "threshold": 1,
+        "scope": "next_run",
+        "reward": "tag"
+      }
+    ]
+  },
+  {
+    "wheel_id": "tag_pitcher",
+    "display_name": "Franchise Tag Pitcher Challenge",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "10 strikeouts next run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "10 strikeouts next run",
+        "metric": "so",
+        "threshold": 10,
+        "scope": "next_run",
+        "reward": "tag"
+      },
+      {
+        "id": "w1",
+        "text": "2 saves next run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "2 saves next run",
+        "metric": "sv",
+        "threshold": 2,
+        "scope": "next_run",
+        "reward": "tag"
+      },
+      {
+        "id": "w2",
+        "text": "15 outs next run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "challenge",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "15 outs next run",
+        "metric": "outs",
+        "threshold": 15,
+        "scope": "next_run",
+        "reward": "tag"
+      },
+      {
+        "id": "w3",
+        "text": "Golden Ticket immediate tag",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "tag",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true,
+          "kind": "pitcher"
+        },
+        "description": "Golden Ticket immediate tag",
+        "metric": null,
+        "threshold": 1,
+        "scope": "next_run",
+        "reward": "tag"
+      }
+    ]
+  },
+  {
+    "wheel_id": "premium",
+    "display_name": "Premium Reward",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Any Legal Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Legal Player"
+      },
+      {
+        "id": "w1",
+        "text": "Any 99",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any 99"
+      },
+      {
+        "id": "w2",
+        "text": "Upgrade Any Position",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Upgrade Any Position"
+      },
+      {
+        "id": "w3",
+        "text": "Two Acquisitions",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Two Acquisitions",
+        "quantity": 2
+      },
+      {
+        "id": "w4",
+        "text": "Two Front Office Spins",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "front_office",
+        "eligibility": {},
+        "description": "Two Front Office Spins",
+        "quantity": 2
+      },
+      {
+        "id": "w5",
+        "text": "Any Hitter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Hitter"
+      },
+      {
+        "id": "w6",
+        "text": "Any Pitcher",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Pitcher"
+      },
+      {
+        "id": "w7",
+        "text": "Any Legend",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Legend"
+      },
+      {
+        "id": "w8",
+        "text": "Any Current Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any Current Player"
+      },
+      {
+        "id": "w9",
+        "text": "Any Team",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "team",
+        "eligibility": {},
+        "description": "Any Team"
+      },
+      {
+        "id": "w10",
+        "text": "Any Division",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "division",
+        "eligibility": {},
+        "description": "Any Division"
+      },
+      {
+        "id": "w11",
+        "text": "Any Series",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "series",
+        "eligibility": {},
+        "description": "Any Series"
+      },
+      {
+        "id": "w12",
+        "text": "Opponent\u2019s Best Player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Opponent\u2019s Best Player"
+      },
+      {
+        "id": "w13",
+        "text": "Same-Player Upgrade",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Same-Player Upgrade"
+      },
+      {
+        "id": "w14",
+        "text": "Bring Back Minor Leaguer",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "call_up",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Promote one existing minor-league card during offseason, then validate roster composition."
+      },
+      {
+        "id": "w15",
+        "text": "Save Pending DFA",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "save_dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Cancel one eligible pending consequence from this run; select the consequence during offseason."
+      },
+      {
+        "id": "w16",
+        "text": "Cancel Elimination Punishment",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "cancel_elimination",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Cancel one eligible pending consequence from this run; select the consequence during offseason."
+      },
+      {
+        "id": "w17",
+        "text": "Protect Player Next Run",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "protect",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Protect Player Next Run"
+      },
+      {
+        "id": "w18",
+        "text": "Franchise Tag Challenge",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "tag_hitter",
+        "eligibility": {},
+        "description": "Franchise Tag Challenge"
+      },
+      {
+        "id": "w19",
+        "text": "Franchise Tag Progress",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Franchise Tag Progress \u2014 record the explicit administrative resolution; historical spins remain unchanged."
+      },
+      {
+        "id": "w20",
+        "text": "Free Trade",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "trade",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Free Trade"
+      },
+      {
+        "id": "w21",
+        "text": "Blockbuster Trade",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "trade",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Blockbuster Trade"
+      },
+      {
+        "id": "w22",
+        "text": "Fan Choice",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Fan Choice"
+      },
+      {
+        "id": "w23",
+        "text": "Bank Premium Reward",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "review",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Bank Premium Reward \u2014 record the explicit administrative resolution; historical spins remain unchanged."
+      },
+      {
+        "id": "w24",
+        "text": "Double Premium",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "extra_spin",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Double Premium",
+        "quantity": 2
+      },
+      {
+        "id": "w25",
+        "text": "Jackpot Player + Protection",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Jackpot Player + Protection"
+      }
+    ]
+  },
+  {
+    "wheel_id": "meltdown",
+    "display_name": "0\u20132 Meltdown",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "DFA two unprotected",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "dfa",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "DFA two unprotected",
+        "quantity": 2
+      },
+      {
+        "id": "w1",
+        "text": "Demote two unprotected",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "demote",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {
+          "needs_target": true
+        },
+        "description": "Demote two unprotected",
+        "quantity": 2
+      },
+      {
+        "id": "w2",
+        "text": "Extra elimination",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": "elimination",
+        "eligibility": {},
+        "description": "Extra elimination"
+      },
+      {
+        "id": "w3",
+        "text": "Mercy: no additional punishment",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "none",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Mercy: no additional punishment"
+      }
+    ]
+  },
+  {
+    "wheel_id": "protection",
+    "display_name": "Protection",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Protect lowest OVR",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "protect",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Protect lowest OVR",
+        "selector": "lowest"
+      },
+      {
+        "id": "w1",
+        "text": "Protect random player",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "protect",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Protect random player",
+        "selector": "random"
+      },
+      {
+        "id": "w2",
+        "text": "Protect worst performer",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "protect",
+        "timing": "immediate",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Protect worst performer",
+        "selector": "worst"
+      }
+    ]
+  },
+  {
+    "wheel_id": "team",
+    "display_name": "MLB Team",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Arizona",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Arizona"
+      },
+      {
+        "id": "w1",
+        "text": "Atlanta",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Atlanta"
+      },
+      {
+        "id": "w2",
+        "text": "Baltimore",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Baltimore"
+      },
+      {
+        "id": "w3",
+        "text": "Boston",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Boston"
+      },
+      {
+        "id": "w4",
+        "text": "Chicago AL",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Chicago AL"
+      },
+      {
+        "id": "w5",
+        "text": "Chicago NL",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Chicago NL"
+      },
+      {
+        "id": "w6",
+        "text": "Cincinnati",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Cincinnati"
+      },
+      {
+        "id": "w7",
+        "text": "Cleveland",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Cleveland"
+      },
+      {
+        "id": "w8",
+        "text": "Colorado",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Colorado"
+      },
+      {
+        "id": "w9",
+        "text": "Detroit",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Detroit"
+      },
+      {
+        "id": "w10",
+        "text": "Houston",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Houston"
+      },
+      {
+        "id": "w11",
+        "text": "Kansas City",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Kansas City"
+      },
+      {
+        "id": "w12",
+        "text": "Los Angeles AL",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Los Angeles AL"
+      },
+      {
+        "id": "w13",
+        "text": "Los Angeles NL",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Los Angeles NL"
+      },
+      {
+        "id": "w14",
+        "text": "Miami",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Miami"
+      },
+      {
+        "id": "w15",
+        "text": "Milwaukee",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Milwaukee"
+      },
+      {
+        "id": "w16",
+        "text": "Minnesota",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Minnesota"
+      },
+      {
+        "id": "w17",
+        "text": "New York AL",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "New York AL"
+      },
+      {
+        "id": "w18",
+        "text": "New York NL",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "New York NL"
+      },
+      {
+        "id": "w19",
+        "text": "Athletics",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Athletics"
+      },
+      {
+        "id": "w20",
+        "text": "Philadelphia",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Philadelphia"
+      },
+      {
+        "id": "w21",
+        "text": "Pittsburgh",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Pittsburgh"
+      },
+      {
+        "id": "w22",
+        "text": "San Diego",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "San Diego"
+      },
+      {
+        "id": "w23",
+        "text": "San Francisco",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "San Francisco"
+      },
+      {
+        "id": "w24",
+        "text": "Seattle",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Seattle"
+      },
+      {
+        "id": "w25",
+        "text": "St. Louis",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "St. Louis"
+      },
+      {
+        "id": "w26",
+        "text": "Tampa Bay",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Tampa Bay"
+      },
+      {
+        "id": "w27",
+        "text": "Texas",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Texas"
+      },
+      {
+        "id": "w28",
+        "text": "Toronto",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Toronto"
+      },
+      {
+        "id": "w29",
+        "text": "Washington",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Washington"
+      }
+    ]
+  },
+  {
+    "wheel_id": "division",
+    "display_name": "Division",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "AL East",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "AL East"
+      },
+      {
+        "id": "w1",
+        "text": "AL Central",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "AL Central"
+      },
+      {
+        "id": "w2",
+        "text": "AL West",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "AL West"
+      },
+      {
+        "id": "w3",
+        "text": "NL East",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "NL East"
+      },
+      {
+        "id": "w4",
+        "text": "NL Central",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "NL Central"
+      },
+      {
+        "id": "w5",
+        "text": "NL West",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "NL West"
+      }
+    ]
+  },
+  {
+    "wheel_id": "series",
+    "display_name": "Card Series",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Live Series",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Live Series"
+      },
+      {
+        "id": "w1",
+        "text": "Legend",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Legend"
+      },
+      {
+        "id": "w2",
+        "text": "Flashback",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Flashback"
+      },
+      {
+        "id": "w3",
+        "text": "Captain",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Captain"
+      },
+      {
+        "id": "w4",
+        "text": "Any legal series",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Any legal series"
+      }
+    ]
+  },
+  {
+    "wheel_id": "attribute",
+    "display_name": "Player Archetype",
+    "wedges": [
+      {
+        "id": "w0",
+        "text": "Power",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Power"
+      },
+      {
+        "id": "w1",
+        "text": "Contact",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Contact"
+      },
+      {
+        "id": "w2",
+        "text": "Speed",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Speed"
+      },
+      {
+        "id": "w3",
+        "text": "Defense",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Defense"
+      },
+      {
+        "id": "w4",
+        "text": "Left-handed bat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Left-handed bat"
+      },
+      {
+        "id": "w5",
+        "text": "Right-handed bat",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Right-handed bat"
+      },
+      {
+        "id": "w6",
+        "text": "Switch hitter",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Switch hitter"
+      },
+      {
+        "id": "w7",
+        "text": "Starting pitcher",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Starting pitcher"
+      },
+      {
+        "id": "w8",
+        "text": "Reliever",
+        "weight": 1,
+        "active": true,
+        "category": "acquire",
+        "effect": "acquire",
+        "timing": "banked",
+        "follow_up": null,
+        "eligibility": {},
+        "description": "Reliever"
+      }
+    ]
+  }
+]

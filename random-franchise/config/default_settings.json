@@ -1,0 +1,33 @@
+{
+  "max_losses": 2,
+  "tag_cap": 3,
+  "meltdown": "wheel",
+  "milestones": {
+    "2": "front_office",
+    "5": "front_office",
+    "7": "protection",
+    "9": "premium",
+    "10": "premium"
+  },
+  "bench_size": 4,
+  "rotation_size": 5,
+  "bullpen_size": 8,
+  "ovr_cap": null,
+  "minor_cooldown": 1,
+  "special_wheels": true,
+  "allowed_team": [],
+  "disallowed_team": [],
+  "allowed_series": [],
+  "disallowed_series": [],
+  "allowed_primary": [],
+  "disallowed_primary": [],
+  "allowed_bat": [],
+  "disallowed_bat": [],
+  "allowed_throw": [],
+  "disallowed_throw": [],
+  "event_start": null,
+  "event_end": null,
+  "event_notes": "",
+  "reduced_motion": true,
+  "sound": false
+}
