@@ -65,7 +65,29 @@ def render(repo,f):
         from models.domain import RuleError
         import json
 
-        used_ids = {s['player_id'] for s in repo.list('stats', fid)}
+        saved_stats = repo.list('stats', fid)
+        used_ids = {s['player_id'] for s in saved_stats}
+
+        gp = {}
+        saved_lines = {}
+        for row in saved_stats:
+            pid = row['player_id']
+            gp[pid] = gp.get(pid, 0) + row['line'].get('games', 0)
+            saved_lines[pid] = saved_lines.get(pid, 0) + 1
+
+        st.caption('Compare DFA entries below. GP includes all runs.')
+        table([
+            {
+                'Player': p['name'],
+                'Card': p['version'],
+                'OVR': p['ovr'],
+                'GP': gp.get(p['id'], 0),
+                'Saved stat lines': saved_lines.get(p['id'], 0),
+                'Player ID': p['id'],
+            }
+            for p in players
+            if p['area'] == 'dfa'
+        ])
         duplicates = [
             p for p in players
             if p['area'] == 'dfa' and p['id'] not in used_ids
