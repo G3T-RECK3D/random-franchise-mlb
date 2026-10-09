@@ -7,11 +7,51 @@ from ui.common import table,navigate
 
 def render(repo,f):
     moves=repo.list('moves',f['id'])
-    table([{'Source':m['source'],'Run':repo.get('runs',m['run_id'])['number'] if m.get('run_id') else '',
-        'Game':repo.get('games',m['game_id'])['number'] if m.get('game_id') else '',
-        'Type':m['type'],'Description':m['description'],'Constraints':json.dumps(m.get('constraints',{})),
-        'Status':m['status'],'Critical':m.get('critical',False),'Timing':'Offseason only'} for m in moves])
-    if locked(repo,f['id']):st.info('Moves are banked until the run ends.');return
+    type_labels = {
+        'acquire': 'Add a player',
+        'trade': 'Trade a player',
+        'save_dfa': 'Save a player from DFA',
+        'cancel_elimination': 'Cancel a removal',
+        'upgrade': 'Upgrade a card',
+        'dfa': 'DFA a player',
+        'demote': 'Send to minors',
+        'call_up': 'Call up a player',
+        'tag': 'Franchise Tag',
+        'protect': 'Protect a player',
+        'extra_spin': 'Extra wheel spin',
+    }
+    status_labels = {
+        'pending': 'Ready for offseason',
+        'deferred': 'Saved for later',
+        'resolved': 'Completed',
+        'canceled': 'Canceled',
+        'invalid': 'Unavailable',
+    }
+
+    table([
+        {
+            'Run': (
+                repo.get('runs', m['run_id'])['number']
+                if m.get('run_id') else ''
+            ),
+            'Game': (
+                repo.get('games', m['game_id'])['number']
+                if m.get('game_id') else ''
+            ),
+            'Move': m['description'],
+            'Action': type_labels.get(
+                m['type'], m['type'].replace('_', ' ').title()
+            ),
+            'Status': status_labels.get(m['status'], m['status']),
+            'Required': (
+                'Yes'
+                if m.get('critical') and m['status'] == 'pending'
+                else ''
+            ),
+            'Available': 'During offseason',
+        }
+        for m in moves
+    ])
     if f['state'] not in [State.MOVES,State.REBUILD,State.VALIDATION]:
         st.info('Confirm Run MVP and complete required offseason wheels first.');navigate('Continue offseason','Offseason');return
     pending=[m for m in moves if m['status'] in ['pending','deferred']]
