@@ -16,6 +16,92 @@ def render(repo,f):
         if st.button('Confirm ended run and select MVP',type='primary'):confirm_end(repo,fid);st.rerun()
     elif state==State.MVP:
         run=repo.get('runs',f['current_run']);ids=run['roster_ids']
+        from services.stat_engine import aggregate
+
+        st.subheader('🏆 Run MVP candidates')
+        st.caption(
+            'Custom contribution points from this run’s saved stats—not WAR. '
+            'Compare hitters and pitchers separately; the final choice is yours.'
+        )
+
+        hitters = []
+        pitchers = []
+
+        for player_id in ids:
+            player = repo.get('players', player_id)
+            if not player:
+                continue
+
+            totals = aggregate(repo, fid, player, run['id'])
+            if not totals.get('games', 0):
+                continue
+
+            if player['kind'] == 'hitter':
+                total_bases = (
+                    totals.get('h', 0)
+                    + totals.get('doubles', 0)
+                    + 2 * totals.get('triples', 0)
+                    + 3 * totals.get('hr', 0)
+                )
+                score = (
+                    total_bases
+                    + totals.get('bb', 0)
+                    + totals.get('hbp', 0)
+                    + totals.get('r', 0)
+                    + totals.get('rbi', 0)
+                    + totals.get('sb', 0)
+                    - totals.get('cs', 0)
+                )
+                hitters.append({
+                    'Player': player['name'],
+                    'Run Value': score,
+                    'PA': totals.get('pa', 0),
+                    'H': totals.get('h', 0),
+                    'HR': totals.get('hr', 0),
+                    'RBI': totals.get('rbi', 0),
+                    'Runs': totals.get('r', 0),
+                    'OPS': f"{totals.get('ops', 0):.3f}",
+                })
+            else:
+                outs = totals.get('outs', 0)
+                score = (
+                    outs
+                    + totals.get('so', 0)
+                    - 3 * totals.get('er', 0)
+                    - totals.get('ha', 0)
+                    - totals.get('bb', 0)
+                )
+                pitchers.append({
+                    'Player': player['name'],
+                    'Run Value': score,
+                    'IP': f"{int(outs) // 3}.{int(outs) % 3}",
+                    'K': totals.get('so', 0),
+                    'ER': totals.get('er', 0),
+                    'Hits allowed': totals.get('ha', 0),
+                    'Walks': totals.get('bb', 0),
+                })
+
+        hitters.sort(key=lambda row: row['Run Value'], reverse=True)
+        pitchers.sort(key=lambda row: row['Run Value'], reverse=True)
+
+        st.markdown('**Top hitters**')
+        table(hitters[:3])
+        st.markdown('**Top pitchers**')
+        table(pitchers[:3])
+
+        with st.expander('How Run Value is calculated'):
+            st.write(
+                'Hitters: total bases + walks + hit-by-pitch '
+                '+ runs + RBI + steals − caught stealing.'
+            )
+            st.write(
+                'Pitchers: outs + strikeouts − (3 × earned runs) '
+                '− hits allowed − walks allowed.'
+            )
+            st.caption(
+                'These are starting weights. The two lists are not calibrated '
+                'to determine whether a hitter or pitcher deserves MVP.'
+            )
         labels={i:repo.get('players',i)['name'] for i in ids}
         pid=st.selectbox('Run MVP',ids,format_func=labels.get)
         st.caption('MVP receives temporary protection through this offseason’s elimination cycle.')
