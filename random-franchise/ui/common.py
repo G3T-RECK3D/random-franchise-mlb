@@ -40,16 +40,19 @@ def context(title, obs=False):
     if not rows:
         return repo, None
     ids = [r['id'] for r in rows]
-    if st.session_state.get('selected_franchise') not in ids:
-        st.session_state['selected_franchise'] = ids[0]
+    if st.session_state.get('active_franchise_id') not in ids:
+        previous = st.session_state.get('selected_franchise')
+        st.session_state['active_franchise_id'] = (
+            previous if previous in ids else ids[0]
+        )
 
     def remember_franchise():
-        st.session_state['selected_franchise'] = (
+        st.session_state['active_franchise_id'] = (
             st.session_state['_franchise_selector']
         )
 
     st.session_state['_franchise_selector'] = (
-        st.session_state['selected_franchise']
+        st.session_state['active_franchise_id']
     )
     chosen = st.sidebar.selectbox(
         'Franchise',
