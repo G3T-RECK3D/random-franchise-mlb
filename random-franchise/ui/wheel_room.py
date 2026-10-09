@@ -101,7 +101,62 @@ def render(repo,f):
     else:
         if not reduced:visual(result,reduced)
         st.success('Result: '+result['result']['text'])
-        if result.get('target'):st.write('Target: '+repo.get('players',result['target'])['name'])
+        outcome = result['result']
+        effect = outcome.get('effect', 'acquire')
+        target = (
+            repo.get('players', result['target'])
+            if result.get('target') else None
+        )
+
+        if not outcome.get('follow_up') and effect in [
+            'acquire', 'trade', 'dfa', 'demote'
+        ]:
+            with st.container(border=True):
+                st.subheader('What this means')
+
+                if effect == 'acquire':
+                    quantity = outcome.get('quantity', 1)
+                    st.write(
+                        f'**Reward:** Add {quantity} Event-eligible '
+                        'card(s) matching this wheel result.'
+                    )
+                    st.write(
+                        '**Player choice:** Choose the incoming card yourself. '
+                        'The displayed target does not apply to this reward.'
+                    )
+                    st.write(
+                        '**Roster:** Your previous starter can stay on the '
+                        'bench if roster limits allow.'
+                    )
+                else:
+                    instructions = {
+                        'trade': 'Trade away the selected player and add one incoming card.',
+                        'dfa': 'Move the selected player to DFA.',
+                        'demote': 'Move the selected player to minors.',
+                    }
+                    st.write('**Required action:** ' + instructions[effect])
+                    if target:
+                        st.write('**Selected player:** ' + target['name'])
+                    if effect == 'trade':
+                        st.write(
+                            '**Incoming card:** Choose an Event-eligible card '
+                            'that satisfies this result’s restrictions.'
+                        )
+
+                st.write(
+                    '**Result instructions:** '
+                    + outcome.get('description', outcome['text'])
+                )
+                branch = result.get('job', {}).get('constraints', [])
+                if branch:
+                    st.write('**Earlier wheel restrictions:** ' + ' → '.join(branch))
+                st.write('**Timing:** Apply during offseason in Banked Moves.')
+                st.caption(
+                    'Click Continue with this result to bank it. '
+                    'This does not change your roster immediately.'
+                )
+        elif target:
+            st.write('Target: ' + target['name'])
         acknowledged=False
         if result['result']['effect']=='arrangement':
             st.info(result['result']['description'])
