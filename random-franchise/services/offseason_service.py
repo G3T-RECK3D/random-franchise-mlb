@@ -65,7 +65,7 @@ def progress(repo, fid):
         repo.put('franchises', f)
 
 
-def resolve_move(repo, fid, mid, action, notes, target_id=None, new_player=None, replace_tag=None, confirmed=False, cancel_move_id=None, max_card_confirmed=False):    with repo.transaction():
+def resolve_move(repo, fid, mid, action, notes, target_id=None, new_player=None, replace_tag=None, confirmed=False, cancel_move_id=None, max_card_confirmed=False):
         m = repo.get('moves', mid)
         if not m or m['franchise_id'] != fid:
             raise RuleError('Invalid move.')
