@@ -5,6 +5,10 @@ from services.demo import load_demo
 from models.domain import RuleError
 from services.backup_service import restore_empty
 
+pending = st.session_state.pop('pending_franchise_selection', None)
+if pending is not None:
+    st.session_state['selected_franchise'] = pending
+
 repo,f=context('Home')
 try:
     st.title('⚾ Random Franchise')
@@ -17,10 +21,10 @@ try:
         event=st.text_input('Event name',value='My Event')
         if st.form_submit_button('Create franchise'):
             fid=create_franchise(repo,name,event)
-            st.session_state['selected_franchise']=fid
+            st.session_state['pending_franchise_selection'] = fid
             st.rerun()
     if st.button('Load Demo Franchise',type='primary'):
-        st.session_state['selected_franchise']=load_demo(repo)
+        st.session_state['pending_franchise_selection'] = load_demo(repo)
         st.rerun()
     if not f:
         with st.expander('Restore a full backup into this empty installation'):
