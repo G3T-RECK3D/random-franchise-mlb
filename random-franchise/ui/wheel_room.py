@@ -116,7 +116,58 @@ def render(repo,f):
         )
 
         if not outcome.get('follow_up') and effect in [
-            'acquire', 'trade', 'dfa', 'demote'
+            'trade', 'trade_market', 'trade_position'
+        ]:
+            with st.container(border=True):
+                st.subheader('What this means')
+                context = job.get('trade_context', {})
+
+                if effect == 'trade':
+                    if target:
+                        st.write('**Outgoing player:** ' + target['name'])
+                    st.write(
+                        '**Next:** Continue to spin the incoming player’s '
+                        'team, division, or league. Then spin their position.'
+                    )
+                    st.caption(
+                        'The trade will be banked after both additional spins. '
+                        'Your roster does not change yet.'
+                    )
+                elif effect == 'trade_market':
+                    st.write('**Incoming market:** ' + outcome['text'])
+                    st.write(
+                        '**Allowed teams:** ' + ', '.join(outcome['teams'])
+                    )
+                    st.write(
+                        '**Next:** Continue to spin the incoming position.'
+                    )
+                else:
+                    st.write(
+                        '**Incoming market:** '
+                        + context.get('market_label', '')
+                    )
+                    st.write('**Position result:** ' + outcome['text'])
+                    st.write(
+                        '**Allowed primary positions:** '
+                        + ', '.join(outcome['positions'])
+                    )
+                    st.write(
+                        '**Next:** Continue to bank the complete trade. '
+                        'Apply it during offseason in Banked Moves.'
+                    )
+
+                st.write(
+                    '**Player type:** Hitter for hitter; pitcher for pitcher. '
+                    'The incoming card must be Event-eligible.'
+                )
+                if context.get('max_ovr') is not None:
+                    st.write(
+                        '**Maximum incoming OVR:** '
+                        + str(context['max_ovr'])
+                    )
+
+        elif not outcome.get('follow_up') and effect in [
+            'acquire', 'dfa', 'demote'
         ]:
             with st.container(border=True):
                 st.subheader('What this means')
