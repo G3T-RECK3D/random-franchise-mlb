@@ -7,7 +7,7 @@ from ui.common import table,navigate
 
 def render(repo,f):
     moves=repo.list('moves',f['id'])
-    table([{'ID':m['id'],'Source':m['source'],'Run':repo.get('runs',m['run_id'])['number'] if m.get('run_id') else '',
+    table([{'Source':m['source'],'Run':repo.get('runs',m['run_id'])['number'] if m.get('run_id') else '',
         'Game':repo.get('games',m['game_id'])['number'] if m.get('game_id') else '',
         'Type':m['type'],'Description':m['description'],'Constraints':json.dumps(m.get('constraints',{})),
         'Status':m['status'],'Critical':m.get('critical',False),'Timing':'Offseason only'} for m in moves])
