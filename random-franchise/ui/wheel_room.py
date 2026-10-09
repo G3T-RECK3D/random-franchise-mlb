@@ -155,8 +155,101 @@ def render(repo,f):
                     'Click Continue with this result to bank it. '
                     'This does not change your roster immediately.'
                 )
-        elif target:
-            st.write('Target: ' + target['name'])
+        else:
+            with st.container(border=True):
+                st.subheader('What this means')
+
+                if outcome.get('follow_up'):
+                    st.write(
+                        '**Next step:** Continue to another wheel. '
+                        'This result’s restrictions carry into that spin.'
+                    )
+                elif effect == 'challenge':
+                    st.write('**Challenge:** ' + outcome['text'])
+                    scopes = {
+                        'next_game': 'Your next qualifying saved game.',
+                        'next_run': 'Your next run.',
+                        'run': 'This run.',
+                    }
+                    scope = outcome.get('scope', 'next_game')
+                    st.write(
+                        '**When it counts:** '
+                        + scopes.get(scope, 'See the challenge instructions.')
+                    )
+                    if outcome.get('metric'):
+                        st.write(
+                            '**Goal:** '
+                            + str(outcome.get('threshold', 1))
+                            + ' ' + outcome['metric'].upper()
+                        )
+                        st.caption('Progress updates from saved game stats.')
+                    else:
+                        st.caption(
+                            'This challenge requires evidence and manual '
+                            'confirmation during offseason.'
+                        )
+                    rewards = {
+                        'tag': 'Franchise Tag',
+                        'protection': 'Player protection',
+                        'upgrade': 'Card upgrade',
+                    }
+                    reward = outcome.get('reward', 'protection')
+                    st.write('**Reward:** ' + rewards.get(reward, reward))
+                elif effect == 'protect':
+                    if 'Next Run' in outcome['text']:
+                        st.write(
+                            '**Reward:** Protection for next run. '
+                            'Continue to bank it, then apply it during offseason.'
+                        )
+                    else:
+                        st.write(
+                            '**Reward:** Give the selected player temporary '
+                            'protection from removal. Applied when you continue.'
+                        )
+                elif effect == 'unprotect':
+                    st.write(
+                        '**Consequence:** Remove the selected player’s '
+                        'temporary protection when you continue.'
+                    )
+                elif effect == 'hot_seat':
+                    st.write(
+                        '**Consequence:** Mark the selected player for Hot Seat '
+                        'targeting when you continue. This does not remove them.'
+                    )
+                elif effect == 'tag':
+                    st.write(
+                        '**Reward:** Grant the selected player a Franchise Tag '
+                        'when you continue. If the tag cap is full, resolve '
+                        'the replacement decision in Banked Moves during offseason.'
+                    )
+                elif effect == 'extra_spin':
+                    st.write(
+                        '**Reward:** Add extra spin(s) on this wheel '
+                        'when you continue.'
+                    )
+                elif effect == 'arrangement':
+                    st.write(
+                        '**Required action:** Apply the arrangement in '
+                        'Roster Manager, then check the confirmation below.'
+                    )
+                elif effect == 'none':
+                    st.write('No roster change or reward is applied.')
+                elif effect == 'deferred':
+                    st.write(
+                        'No eligible result was available. Continue to defer '
+                        'this branch, or use the retry button if available.'
+                    )
+                else:
+                    st.write(
+                        '**Timing:** Continue to bank this result. '
+                        'Review and resolve it during offseason in Banked Moves.'
+                    )
+
+                if target and not outcome.get('follow_up'):
+                    st.write('**Selected player:** ' + target['name'])
+                description = outcome.get('description')
+                if description:
+                    st.write('**Instructions:** ' + description)
         acknowledged=False
         if result['result']['effect']=='arrangement':
             st.info(result['result']['description'])
