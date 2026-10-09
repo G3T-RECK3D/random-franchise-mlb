@@ -235,6 +235,62 @@ def spin(repo, fid, job_id):
         repo.put('spins', record)
         return record
 
+def _bank_trade_result(repo, fid, saved_spin, context):
+    original = context['original_result']
+    key = 'move:' + context['original_spin_id']
+
+    if repo.get('moves', key):
+        return
+
+    constraints = {
+        'instruction': original.get('description', original['text']),
+        'branch': list(context.get('branch', [])),
+        'quantity': 1,
+        'kind': context['kind'],
+        'teams': list(context['teams']),
+        'positions': list(context['positions']),
+        'market_label': context['market_label'],
+        'position_label': context['position_label'],
+    }
+    if context.get('max_ovr') is not None:
+        constraints['max_ovr'] = context['max_ovr']
+
+    repo.put('moves', dict(
+        id=key,
+        franchise_id=fid,
+        run_id=saved_spin['run_id'],
+        game_id=context.get('game_id'),
+        created_at=now(),
+        source=context['source'],
+        spin_id=context['original_spin_id'],
+        type='trade',
+        target=context['target'],
+        description=(
+            original['text'] + ' · '
+            + context['market_label'] + ' · '
+            + context['position_label']
+        ),
+        constraints=constraints,
+        status='pending',
+        critical=True,
+        resolution_notes='',
+    ))
+def _queue_trade_step(repo, fid, franchise, job, saved_spin,
+                      wheel_id, context):
+    enqueue(
+        franchise,
+        wheel_id,
+        job['source'],
+        job.get('game_id'),
+        context['target'],
+        job.get('depth', 0) + 1,
+    )
+
+    next_job = franchise['queue'].pop()
+    next_job['trade_context'] = dict(context)
+    next_job['constraints'] = list(job.get('constraints', []))
+    next_job['parent_spin'] = saved_spin['id']
+    franchise['queue'].insert(0, next_job)
 
 def continue_spin(repo, fid, job_id, acknowledged=False):
     with repo.transaction():
