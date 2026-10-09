@@ -116,6 +116,51 @@ def resolve_move(repo, fid, mid, action, notes, target_id=None, new_player=None,
                 targets = [pid] + [p['id'] for p in pool if p['id'] != pid][:quantity - 1]
                 if len(targets) < quantity:
                     raise RuleError('Not enough eligible players for the required quantity.')
+                if m['type'] == 'trade':
+                    if not isinstance(new_player, dict):
+                        raise RuleError('Enter one incoming trade card.')
+
+                    outgoing = repo.get('players', pid)
+                    rules = m.get('constraints', {})
+                    required_kind = rules.get('kind', outgoing['kind'])
+
+                    if new_player.get('kind') != required_kind:
+                        raise RuleError(
+                            'Trade hitters for hitters and pitchers for pitchers.'
+                        )
+                    if new_player.get('eligibility') != 'legal':
+                        raise RuleError('The incoming card must be Event-legal.')
+
+                    allowed_teams = rules.get('teams', [])
+                    incoming_team = str(new_player.get('team', '')).strip()
+                    if allowed_teams and incoming_team.casefold() not in {
+                        team.casefold() for team in allowed_teams
+                    }:
+                        raise RuleError(
+                            'Incoming team must match the market spin. '
+                            'Allowed teams: ' + ', '.join(allowed_teams)
+                        )
+
+                    allowed_positions = rules.get('positions', [])
+                    if (
+                        allowed_positions
+                        and new_player.get('primary') not in allowed_positions
+                    ):
+                        raise RuleError(
+                            'Incoming primary position must match the position '
+                            'spin: ' + ', '.join(allowed_positions)
+                        )
+
+                    max_ovr = rules.get('max_ovr')
+                    if max_ovr is not None:
+                        incoming_ovr = new_player.get('ovr')
+                        if (
+                            type(incoming_ovr) is not int
+                            or not 0 <= incoming_ovr <= max_ovr
+                        ):
+                            raise RuleError(
+                                f'Incoming OVR must be {max_ovr} or lower.'
+                            )
                 for target in targets:
                     remove_player(repo, fid, target, 'minors' if m['type'] == 'demote' else 'dfa')
                 if m['type'] == 'trade':
