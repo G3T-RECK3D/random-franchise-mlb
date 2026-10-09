@@ -317,6 +317,57 @@ def continue_spin(repo, fid, job_id, acknowledged=False):
             # Keep nested branch before unrelated milestone jobs.
             new = f['queue'][-children:]
             f['queue'] = new + f['queue'][:-children]
+        elif effect == 'trade_market':
+            context = dict(job['trade_context'])
+            context['teams'] = list(w['teams'])
+            context['market_label'] = w['text']
+            _queue_trade_step(
+                repo, fid, f, job, s, 'trade_position', context
+            )
+            f['queue'][0]['constraints'].append(
+                'Incoming market: ' + w['text']
+            )
+
+        elif effect == 'trade_position':
+            context = dict(job['trade_context'])
+            context['positions'] = list(w['positions'])
+            context['position_label'] = w['text']
+            _bank_trade_result(repo, fid, s, context)
+
+        elif effect == 'trade':
+            if not target:
+                raise RuleError('This trade needs an outgoing player.')
+            if w.get('quantity', 1) != 1:
+                raise RuleError(
+                    'The new trade sequence supports one outgoing player.'
+                )
+
+            title = w['text'].strip().casefold()
+            forced = (
+                'forced trade' in title
+                or title in [
+                    'trade random starter',
+                    'future trade candidate',
+                ]
+                or job['wheel_id'] in ['elimination', 'meltdown']
+            )
+
+            context = {
+                'original_spin_id': s['id'],
+                'original_result': dict(w),
+                'target': target['id'],
+                'kind': target['kind'],
+                'max_ovr': target['ovr'] if forced else None,
+                'game_id': job.get('game_id'),
+                'source': job['source'],
+                'branch': list(job.get('constraints', [])),
+            }
+            _queue_trade_step(
+                repo, fid, f, job, s, 'trade_market', context
+            )
+            f['queue'][0]['constraints'].append(
+                'Original trade: ' + w['text']
+            )
         elif effect == 'extra_spin':
             for _ in range(w.get('quantity', 1)):
                 enqueue(f, job['wheel_id'], job['source'], job.get('game_id'), job.get('target'), job.get('depth', 0) + 1)
