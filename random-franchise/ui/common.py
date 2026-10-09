@@ -42,7 +42,24 @@ def context(title, obs=False):
     ids = [r['id'] for r in rows]
     if st.session_state.get('selected_franchise') not in ids:
         st.session_state['selected_franchise'] = ids[0]
-    chosen = st.sidebar.selectbox('Franchise',ids,format_func=lambda i:next(r['name'] for r in rows if r['id']==i),key='selected_franchise')
+
+    def remember_franchise():
+        st.session_state['selected_franchise'] = (
+            st.session_state['_franchise_selector']
+        )
+
+    st.session_state['_franchise_selector'] = (
+        st.session_state['selected_franchise']
+    )
+    chosen = st.sidebar.selectbox(
+        'Franchise',
+        ids,
+        format_func=lambda identifier: next(
+            row['name'] for row in rows if row['id'] == identifier
+        ),
+        key='_franchise_selector',
+        on_change=remember_franchise,
+    )
     f = repo.get('franchises',chosen)
     if not obs:
         st.title(title)
