@@ -6,18 +6,17 @@ from ui.common import run_page, table
 
 def card_avatar(player, initials):
     cards = {
-        ('byron buxton', 84): 'bc1803df31e29cfb7e0b388f322f99fa',
-        ('jose ramirez', 95): '56c113bcf0449e4c45679da6a9f521de',
-        ('josé ramírez', 95): '56c113bcf0449e4c45679da6a9f521de',
-        ('anthony santander', 99): '84dd4b33f55f5f9656a8cca4d3cbd830',
-        ('bryce rainer', 99): 'c7cb5ff305bb6c298537a72ac07b32d2',
-        ('willi castro', 96): '626f64b9a9c037091a21bd550500a3ca',
-        ('max muncy', 92): '5fe05e1065c026ec88edd48e841c80a7',
-        ('brandon lowe', 99): '511afa937bcdcc8b07fa7fe3f46620bc',
-        ('troy melton', 97): 'a013e5e418f67b7a22a2d7770e8920c7',
-        ('carter jensen', 99): 'f3a37a39d5aa314db546503a4b6a8473',
-        ('shohei ohtani', 95): '81fb5e540ef2220e9a66f8441ba750b3',
-        ('shohei ohtani dh', 95): '81fb5e540ef2220e9a66f8441ba750b3',
+        ('manny ramirez', 94): 'f5e8e6d59d01a65fa1a76fe3bc41d753',
+        ('carlos beltran', 92): 'ae298137b980fa4713aa235891188659',
+        ('carlos beltrán', 92): 'ae298137b980fa4713aa235891188659',
+        ('luis lara', 96): 'b85163e6c27ffebaab0cfa52e6deb84d',
+        ('daniel schneemann', 90): 'c4b6a635bc56b98c94d77a9188b2087b',
+        ('ozzie albies', 89): '3b1a482628a2a10f81bb6e47b9ee4e2d',
+        ('chase headley', 88): '0725dd19ed80c6cff262389a69fa379e',
+        ('chase utley', 88): '16588688df24c071adf191b89717de13',
+        ('cam schlittler', 98): 'ebb513f936b81fb5910c21d7687cbcad',
+        ('anthony seigler', 67): '3675fe0474e7202d802666cb405a3ffa',
+        ('junior caminero', 87): '5f74a86f361c5124d1ef06cbabad638e',
     }
     key = (player['name'].strip().casefold(), int(player['ovr']))
     card_id = cards.get(key)
