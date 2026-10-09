@@ -45,3 +45,56 @@ def render(repo,f):
                     audit(repo,fid,'wheel_configuration',before,wheel,'Wheel editor')
                 st.rerun()
     with st.expander('Administrative corrections'):correction(repo,f)
+    with st.expander('Delete an empty test franchise'):
+        history_tables = [
+            'players', 'runs', 'games', 'stats', 'spins', 'moves',
+            'rewards', 'challenges', 'snapshots', 'corrections', 'tags',
+        ]
+        candidates = [
+            franchise
+            for franchise in repo.list('franchises')
+            if franchise['id'] != fid
+            and franchise['name'].strip().casefold().startswith('test')
+            and not any(
+                repo.list(table_name, franchise['id'])
+                for table_name in history_tables
+            )
+        ]
+
+        if not candidates:
+            st.info('No other empty test franchises are available to delete.')
+        else:
+            choices = {item['id']: item for item in candidates}
+            delete_id = st.selectbox(
+                'Empty test franchise to delete',
+                list(choices),
+                format_func=lambda identifier: (
+                    choices[identifier]['name']
+                    + ' · ' + choices[identifier].get('event', '')
+                    + ' · ID ending ' + identifier[-6:]
+                ),
+                key='delete_empty_test_target',
+            )
+            confirmed = st.checkbox(
+                'Permanently delete this empty test franchise.',
+                key='delete_empty_test_confirm',
+            )
+            if st.button('Delete empty test franchise', disabled=not confirmed):
+                with repo.transaction():
+                    selected = repo.get('franchises', delete_id)
+                    if (
+                        not selected
+                        or delete_id == fid
+                        or not selected['name'].strip().casefold().startswith('test')
+                        or any(
+                            repo.list(table_name, delete_id)
+                            for table_name in history_tables
+                        )
+                    ):
+                        raise RuleError('Only another empty test franchise can be deleted.')
+
+                    for table_name in ['wheels', 'settings']:
+                        for row in repo.list(table_name, delete_id):
+                            repo.delete(table_name, row['id'])
+                    repo.delete('franchises', delete_id)
+                st.rerun()
