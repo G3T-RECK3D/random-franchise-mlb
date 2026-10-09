@@ -32,12 +32,23 @@ def render(repo,f):
             eligible=[x for x in moves if x['run_id']==m['run_id'] and x['status']=='pending' and x['type'] in (['dfa'] if m['type']=='save_dfa' else ['dfa','demote','trade'])]
             cancel_id=st.selectbox('Consequence to cancel',[None]+[x['id'] for x in eligible],format_func=lambda i:next((x['description'] for x in eligible if x['id']==i),'Choose a consequence'))
         new=None
+        max_card_confirmed = False
         if m['type'] == 'upgrade':
             player = repo.get('players', m['target'])
             st.info(
-                'Upgrade ' + player['name']
-                + ' to the next available higher-rated Event-legal card. '
-                'Keep the name and player type unchanged; update the card details.'
+                player['name'] + ' earned this upgrade. '
+                'Normally, upgrade their own card. If they have no higher '
+                'Event-eligible card, you may upgrade one active teammate instead.'
+            )
+            max_card_confirmed = st.checkbox(
+                'I verified the player who earned this reward has no '
+                'higher-rated Event-eligible card available.'
+            )
+            st.caption(
+                'For a teammate upgrade, select the teammate in the Target '
+                'dropdown above. Replace the JSON with that teammate’s '
+                'name, type, and next available higher-rated Event-legal '
+                'card details. Explain the transfer in Resolution notes.'
             )
             template = {
                 field: player.get(field, '')
@@ -71,4 +82,9 @@ def render(repo,f):
                     new=parsed[0] if m['type'] in ['trade','upgrade'] and isinstance(parsed,list) and len(parsed)==1 else parsed
                 except (ValueError,IndexError):
                     st.error('Incoming JSON is invalid.');return
-            resolve_move(repo,f['id'],mid,action,notes,target,new,replacement,confirm,cancel_id);st.rerun()
+            resolve_move(
+                repo, f['id'], mid, action, notes,
+                target, new, replacement, confirm, cancel_id,
+                max_card_confirmed=max_card_confirmed,
+            )
+            st.rerun()
