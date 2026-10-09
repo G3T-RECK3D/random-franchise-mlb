@@ -104,7 +104,7 @@ def unlock_development(repo, fid, run_id, game_id):
             continue
 
         player = repo.get('players', stat['player_id'])
-        if not player or player['ovr'] >= 99:
+        if not player:
             continue
 
         line = stat['line']
