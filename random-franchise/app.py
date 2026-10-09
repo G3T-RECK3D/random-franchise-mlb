@@ -7,7 +7,7 @@ from services.backup_service import restore_empty
 
 pending = st.session_state.pop('pending_franchise_selection', None)
 if pending is not None:
-    st.session_state['selected_franchise'] = pending
+    st.session_state['active_franchise_id'] = pending
 
 repo,f=context('Home')
 try:
