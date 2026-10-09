@@ -83,8 +83,15 @@ def render(repo,f):
     job=current_job(repo,f['id'])
     if not job:
         st.info('No wheel is due right now.');navigate('Next step on dashboard','Dashboard');return
-    wheel=repo.get('wheels',f"{f['id']}:{job['wheel_id']}")
-    st.subheader(wheel['display_name'])
+    special_names = {
+        'trade_market': 'Trade Market — Team, Division, or League',
+        'trade_position': 'Trade Position',
+    }
+    if job['wheel_id'] in special_names:
+        st.subheader(special_names[job['wheel_id']])
+    else:
+        wheel = repo.get('wheels', f"{f['id']}:{job['wheel_id']}")
+        st.subheader(wheel['display_name'])
     st.caption('Source: '+job['source'])
     if job.get('constraints'):st.info('Branch constraints: '+' → '.join(job['constraints']))
     cfg=settings(repo,f['id'])
