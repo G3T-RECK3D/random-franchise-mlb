@@ -4,6 +4,35 @@ import streamlit.components.v1 as components
 from ui.common import run_page, table
 
 
+def card_avatar(player, initials):
+    cards = {
+        ('byron buxton', 84): 'bc1803df31e29cfb7e0b388f322f99fa',
+        ('jose ramirez', 95): '56c113bcf0449e4c45679da6a9f521de',
+        ('josé ramírez', 95): '56c113bcf0449e4c45679da6a9f521de',
+        ('anthony santander', 99): '84dd4b33f55f5f9656a8cca4d3cbd830',
+        ('bryce rainer', 99): 'c7cb5ff305bb6c298537a72ac07b32d2',
+        ('willi castro', 96): '626f64b9a9c037091a21bd550500a3ca',
+        ('max muncy', 92): '5fe05e1065c026ec88edd48e841c80a7',
+        ('brandon lowe', 99): '511afa937bcdcc8b07fa7fe3f46620bc',
+        ('troy melton', 97): 'a013e5e418f67b7a22a2d7770e8920c7',
+        ('carter jensen', 99): 'f3a37a39d5aa314db546503a4b6a8473',
+        ('shohei ohtani', 95): '81fb5e540ef2220e9a66f8441ba750b3',
+        ('shohei ohtani dh', 95): '81fb5e540ef2220e9a66f8441ba750b3',
+    }
+    key = (player['name'].strip().casefold(), int(player['ovr']))
+    card_id = cards.get(key)
+
+    if not card_id:
+        return f'<div class="avatar">{html.escape(initials)}</div>'
+
+    url = f'https://cards.theshow.com/mlb26/{card_id}-baked-lg.webp'
+    return (
+        '<div class="card-art">'
+        f'<span>{html.escape(initials)}</span>'
+        f'<img src="{url}" alt="{html.escape(player["name"], quote=True)}" '
+        'onerror="this.style.display=\'none\'">'
+        '</div>'
+    )
 def render(repo, f):
     players = repo.list('players', f['id'])
     lineup = sorted(
@@ -33,7 +62,7 @@ def render(repo, f):
 
     positions = {
         'LF': (20, 19),
-        'CF': (50, 10),
+        'CF': (50, 17),
         'RF': (80, 19),
         'SS': (34, 40),
         '2B': (66, 40),
@@ -81,12 +110,12 @@ def render(repo, f):
             fit = 'out-of-position'
         cards.append(
             f'<div class="player {fit}" style="left:{x}%;top:{y}%">'
-            f'<div class="avatar">{html.escape(initials)}</div>'
-            f'<div class="name">{html.escape(p["name"])}</div>'
-            f'<div class="details">{order}{html.escape(primary)}'
-            f' · {p["ovr"]} OVR</div>'
-            f'<div class="version">{html.escape(series)}</div>'
-            '</div>'
+            + card_avatar(p, initials)
+            + f'<div class="name">{html.escape(p["name"])}</div>'
+            + f'<div class="details">{order}{html.escape(primary)}'
+            + f' · {p["ovr"]} OVR</div>'
+            + f'<div class="version">{html.escape(series)}</div>'
+            + '</div>'
         )
 
     components.html(
@@ -161,6 +190,29 @@ def render(repo, f):
             font-size:18px;
             font-weight:bold;
             box-shadow:0 3px 10px #0006;
+        }
+        .card-art {
+            position:relative;
+            width:58px;
+            height:80px;
+            margin:0 auto 8px;
+            display:grid;
+            place-items:center;
+            background:#142c46;
+            border-radius:5px;
+            overflow:hidden;
+            font-weight:bold;
+        }
+        .card-art img {
+            position:absolute;
+            inset:0;
+            width:100%;
+            height:100%;
+            object-fit:contain;
+            background:#142c46;
+        }
+        @media(max-width:600px) {
+            .card-art { width:40px; height:55px; }
         }
         .name {
             font-size:14px;
