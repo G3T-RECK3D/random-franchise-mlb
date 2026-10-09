@@ -6,6 +6,110 @@ from services.roster_service import target_pool, protected
 from services.stat_engine import aggregate
 from services.challenge_service import create
 
+def trade_position_options(kind):
+    if kind == 'hitter':
+        groups = {
+            'Catcher': ['C'],
+            'First Base': ['1B'],
+            'Second Base': ['2B'],
+            'Third Base': ['3B'],
+            'Shortstop': ['SS'],
+            'Left Field': ['LF'],
+            'Center Field': ['CF'],
+            'Right Field': ['RF'],
+            'Designated Hitter': ['DH'],
+            'Infield': ['1B', '2B', '3B', 'SS'],
+            'Outfield': ['LF', 'CF', 'RF'],
+            'Corner Infield': ['1B', '3B'],
+            'Middle Infield': ['2B', 'SS'],
+        }
+    elif kind == 'pitcher':
+        groups = {
+            'Starting Pitcher': ['SP'],
+            'Relief Pitcher': ['RP'],
+            'Closing Pitcher': ['CP'],
+            'Any Reliever': ['RP', 'CP'],
+            'Any Pitcher': ['SP', 'RP', 'CP'],
+        }
+    else:
+        raise RuleError('Trade target must be a hitter or pitcher.')
+
+    return [
+        dict(
+            id='trade_position:' + str(index),
+            text=label,
+            weight=1,
+            active=True,
+            effect='trade_position',
+            positions=positions,
+            description='Incoming card primary position: '
+                        + ', '.join(positions),
+        )
+        for index, (label, positions) in enumerate(groups.items())
+    ]
+
+
+def trade_market_options():
+    divisions = {
+        'AL East': [
+            'Baltimore Orioles', 'Boston Red Sox', 'New York Yankees',
+            'Tampa Bay Rays', 'Toronto Blue Jays',
+        ],
+        'AL Central': [
+            'Chicago White Sox', 'Cleveland Guardians', 'Detroit Tigers',
+            'Kansas City Royals', 'Minnesota Twins',
+        ],
+        'AL West': [
+            'Athletics', 'Houston Astros', 'Los Angeles Angels',
+            'Seattle Mariners', 'Texas Rangers',
+        ],
+        'NL East': [
+            'Atlanta Braves', 'Miami Marlins', 'New York Mets',
+            'Philadelphia Phillies', 'Washington Nationals',
+        ],
+        'NL Central': [
+            'Chicago Cubs', 'Cincinnati Reds', 'Milwaukee Brewers',
+            'Pittsburgh Pirates', 'St. Louis Cardinals',
+        ],
+        'NL West': [
+            'Arizona Diamondbacks', 'Colorado Rockies',
+            'Los Angeles Dodgers', 'San Diego Padres',
+            'San Francisco Giants',
+        ],
+    }
+
+    markets = {}
+    for teams in divisions.values():
+        for team in teams:
+            markets[team] = [team]
+
+    for division, teams in divisions.items():
+        markets[division] = list(teams)
+
+    for prefix, label in [
+        ('AL', 'American League'),
+        ('NL', 'National League'),
+    ]:
+        markets[label] = [
+            team
+            for division, teams in divisions.items()
+            if division.startswith(prefix)
+            for team in teams
+        ]
+
+    return [
+        dict(
+            id='trade_market:' + str(index),
+            text=label,
+            weight=1,
+            active=True,
+            effect='trade_market',
+            teams=teams,
+            description='Choose an incoming card from: '
+                        + ', '.join(teams),
+        )
+        for index, (label, teams) in enumerate(markets.items())
+    ]
 
 def current_job(repo, fid):
     f = repo.get('franchises', fid)
@@ -36,6 +140,13 @@ def _performance(repo, fid, p):
 
 
 def available(repo, fid, job):
+    if job['wheel_id'] == 'trade_market':
+        return trade_market_options()
+
+    if job['wheel_id'] == 'trade_position':
+        kind = job.get('trade_context', {}).get('kind')
+        return trade_position_options(kind)
+
     wheel = repo.get('wheels', f"{fid}:{job['wheel_id']}")
     if not wheel:
         raise RuleError('Wheel configuration missing.')
