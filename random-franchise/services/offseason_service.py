@@ -65,8 +65,7 @@ def progress(repo, fid):
         repo.put('franchises', f)
 
 
-def resolve_move(repo, fid, mid, action, notes, target_id=None, new_player=None, replace_tag=None, confirmed=False, cancel_move_id=None):
-    with repo.transaction():
+def resolve_move(repo, fid, mid, action, notes, target_id=None, new_player=None, replace_tag=None, confirmed=False, cancel_move_id=None, max_card_confirmed=False):    with repo.transaction():
         m = repo.get('moves', mid)
         if not m or m['franchise_id'] != fid:
             raise RuleError('Invalid move.')
@@ -142,10 +141,23 @@ def resolve_move(repo, fid, mid, action, notes, target_id=None, new_player=None,
                 from models.domain import POSITIONS, ACTIVE_AREAS
                 from services.roster_validator import legal_positions
 
-                if target_id and target_id != m.get('target'):
-                    raise RuleError('Use the player who earned this upgrade.')
+                earned_by = repo.get('players', m.get('target'))
+                if not earned_by or earned_by['franchise_id'] != fid:
+                    raise RuleError('The player who earned this reward is unavailable.')
 
-                p = repo.get('players', m.get('target'))
+                recipient_id = target_id or earned_by['id']
+                if recipient_id != earned_by['id']:
+                    if m.get('source') != 'development':
+                        raise RuleError('This upgrade cannot transfer to a teammate.')
+                    if max_card_confirmed is not True:
+                        raise RuleError(
+                            'Confirm that the original player has no higher '
+                            'Event-eligible card before choosing a teammate.'
+                        )
+                    m['upgrade_earned_by'] = earned_by['id']
+
+                m['upgrade_recipient'] = recipient_id
+                p = repo.get('players', recipient_id)
                 if not p or p['franchise_id'] != fid:
                     raise RuleError('The upgrade player is unavailable.')
                 if p['area'] not in ACTIVE_AREAS:
