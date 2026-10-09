@@ -70,13 +70,22 @@ def render(repo, f):
             '#' + str(p['order']) + ' · '
             if p['kind'] == 'hitter' else ''
         )
+        primary = str(p.get('primary') or 'Unknown')
+        series = str(p.get('series') or 'Series not entered')
+        secondary = p.get('secondary') or []
+        if position == 'DH' or position == primary:
+            fit = 'primary'
+        elif position in secondary:
+            fit = 'secondary'
+        else:
+            fit = 'out-of-position'
         cards.append(
-            f'<div class="player" style="left:{x}%;top:{y}%">'
+            f'<div class="player {fit}" style="left:{x}%;top:{y}%">'
             f'<div class="avatar">{html.escape(initials)}</div>'
             f'<div class="name">{html.escape(p["name"])}</div>'
-            f'<div class="details">{order}{html.escape(position)}'
+            f'<div class="details">{order}{html.escape(primary)}'
             f' · {p["ovr"]} OVR</div>'
-            f'<div class="version">{html.escape(str(p["version"]))}</div>'
+            f'<div class="version">{html.escape(series)}</div>'
             '</div>'
         )
 
@@ -116,9 +125,29 @@ def render(repo, f):
             box-shadow:0 12px 25px #0008, inset 0 1px 0 #ffffff20;
             transition:transform .2s,box-shadow .2s;
         }
+        .player.primary {
+            --position-glow:rgba(52,211,153,.35);
+            border-color:#62c99d;
+        }
+        .player.secondary {
+            --position-glow:rgba(250,204,21,.35);
+            border-color:#d4b952;
+        }
+        .player.out-of-position {
+            --position-glow:rgba(248,113,113,.35);
+            border-color:#d47777;
+        }
+        .player.primary,
+        .player.secondary,
+        .player.out-of-position {
+            box-shadow:0 12px 25px #0008,
+                       0 0 22px 5px var(--position-glow),
+                       inset 0 1px 0 #ffffff20;
+        }
         .player:hover {
             transform:translate(-50%,-50%) scale(1.06);
-            box-shadow:0 15px 30px #000a,0 0 20px #f9c74f40;
+            box-shadow:0 15px 30px #000a,
+                       0 0 28px 7px var(--position-glow);
             z-index:5;
         }
         .avatar {
