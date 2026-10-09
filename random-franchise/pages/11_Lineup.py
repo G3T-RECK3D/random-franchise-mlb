@@ -111,11 +111,12 @@ def render(repo, f):
         cards.append(
             f'<div class="player {fit}" style="left:{x}%;top:{y}%">'
             + card_avatar(p, initials)
+            + '<div class="player-info">'
             + f'<div class="name">{html.escape(p["name"])}</div>'
             + f'<div class="details">{order}{html.escape(primary)}'
             + f' · {p["ovr"]} OVR</div>'
             + f'<div class="version">{html.escape(series)}</div>'
-            + '</div>'
+            + '</div></div>'
         )
 
     components.html(
@@ -247,6 +248,67 @@ def render(repo, f):
         }
         @media(prefers-reduced-motion:reduce) {
             .player { transition:none; }
+        }
+        .player {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            width:250px;
+            padding:0;
+            background:none;
+            border:none;
+            border-radius:0;
+            box-shadow:none;
+            text-align:left;
+        }
+        .player.primary,
+        .player.secondary,
+        .player.out-of-position,
+        .player:hover {
+            box-shadow:none;
+        }
+        .player .card-art {
+            flex:0 0 82px;
+            width:82px;
+            height:114px;
+            margin:0;
+            background:transparent;
+            overflow:visible;
+            box-shadow:0 0 18px 3px var(--position-glow);
+        }
+        .card-art img {
+            background:transparent;
+            border-radius:5px;
+        }
+        .player-info {
+            flex:1;
+            min-width:0;
+        }
+        .player .name {
+            font-size:14px;
+            line-height:1.25;
+            text-shadow:0 2px 4px #000,0 0 8px #000;
+        }
+        .player .details {
+            margin-top:6px;
+        }
+        .player .version {
+            line-height:1.35;
+            text-shadow:0 2px 4px #000,0 0 8px #000;
+        }
+        @media(max-width:600px) {
+            .player {
+                flex-direction:column;
+                gap:5px;
+                width:100px;
+                text-align:center;
+            }
+            .player .card-art {
+                flex:0 0 auto;
+                width:48px;
+                height:66px;
+            }
+            .player .name { font-size:11px; }
         }
         </style>
         <div class="field">
