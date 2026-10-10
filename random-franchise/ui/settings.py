@@ -8,6 +8,31 @@ from ui.game_entry import correction
 
 def render(repo,f):
     fid=f['id'];cfg=settings(repo,fid)
+    with st.expander('Restore previous Event seasons'):
+        from services.franchise_service import setup_recovered_seasons
+
+        st.write('Selected franchise: **' + f['name'] + '**')
+        st.write('Season 1: 2026 Wildcard Series Event — completed')
+        st.write('Season 2: 2026 Division Series Event — current')
+
+        if not repo.list('runs', fid) and not repo.list('games', fid):
+            if st.button(
+                'Set up these two seasons',
+                key='recover_seasons:' + fid,
+            ):
+                setup_recovered_seasons(repo, fid)
+                st.rerun()
+        else:
+            st.info('Recovery setup is available before adding weeks or games.')
+
+        for season in sorted(
+            repo.list('seasons', fid),
+            key=lambda item: item['number'],
+        ):
+            st.write(
+                f"Season {season['number']}: {season['name']}"
+                f" — {season['status']}"
+            )
     st.subheader('Back up your complete app data')
     st.caption('This backup contains all franchises, games, stats, wheels, and audits. Local cloud disk is temporary. Download after each session; restore with the documented database command.')
     st.download_button('Download full SQLite backup',repo.backup_bytes(),'random_franchise_backup.db','application/octet-stream')
