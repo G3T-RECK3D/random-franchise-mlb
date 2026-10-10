@@ -10,13 +10,50 @@ def defaults(name: str):
 def create_franchise(repo, name: str, event: str) -> str:
     if not name.strip() or not event.strip():
         raise RuleError('Franchise and Event names are required.')
+
     identifier = uid()
+    season_id = uid()
+    created = now()
+
     with repo.transaction():
-        repo.put('franchises', dict(id=identifier, franchise_id=identifier, name=name.strip(), event=event.strip(),
-            state=State.SETUP, current_run=None, queue=[], return_state=State.ACTIVE, created_at=now()))
-        repo.put('settings', dict(id=identifier, franchise_id=identifier, values=defaults('default_settings.json')))
+        repo.put('franchises', dict(
+            id=identifier,
+            franchise_id=identifier,
+            name=name.strip(),
+            event=event.strip(),
+            state=State.SETUP,
+            current_run=None,
+            current_season=season_id,
+            queue=[],
+            return_state=State.ACTIVE,
+            created_at=created,
+        ))
+
+        repo.put('seasons', dict(
+            id=season_id,
+            franchise_id=identifier,
+            number=1,
+            name=event.strip(),
+            event=event.strip(),
+            status='active',
+            started_at=created,
+            ended_at=None,
+            mvp=None,
+        ))
+
+        repo.put('settings', dict(
+            id=identifier,
+            franchise_id=identifier,
+            values=defaults('default_settings.json'),
+        ))
+
         for wheel in defaults('default_wheels.json'):
-            repo.put('wheels', dict(wheel, id=f"{identifier}:{wheel['wheel_id']}", franchise_id=identifier))
+            repo.put('wheels', dict(
+                wheel,
+                id=f"{identifier}:{wheel['wheel_id']}",
+                franchise_id=identifier,
+            ))
+
     return identifier
 
 def settings(repo, fid):
