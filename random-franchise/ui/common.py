@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import streamlit as st
 from models.domain import RuleError, State
-from repositories.sqlite import SQLiteRepository
+from repositories.postgres import PostgresRepository
 from services.roster_service import locked
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,7 +33,7 @@ def authorize():
 def context(title, obs=False):
     st.set_page_config(page_title='Random Franchise · '+title,page_icon='⚾',layout='wide')
     authorize()
-    repo = SQLiteRepository(repo_path())
+    repo = PostgresRepository(st.secrets['postgres'])
     rows = repo.list('franchises')
     with st.expander('Temporary database check'):
         st.write('Current database:', str(Path(repo_path()).resolve()))
