@@ -46,3 +46,27 @@ def aggregate(repo, franchise_id: str, player: dict, run_id=None, game_id=None) 
             for key in keys:
                 totals[key] += row['line'].get(key, 0)
     return calculate(player['kind'], totals)
+def aggregate_season(repo, franchise_id, player, season_id):
+    """Combine saved stats from all weeks belonging to one season."""
+    season = repo.get('seasons', season_id)
+    if not season or season['franchise_id'] != franchise_id:
+        raise RuleError('Select a valid season for this franchise.')
+
+    run_ids = {
+        run['id']
+        for run in repo.list('runs', franchise_id)
+        if run.get('season_id') == season_id
+    }
+
+    keys = HITTER if player['kind'] == 'hitter' else PITCHER
+    totals = {key: 0 for key in keys}
+
+    for row in repo.list('stats', franchise_id):
+        if (
+            row['player_id'] == player['id']
+            and row['run_id'] in run_ids
+        ):
+            for key in keys:
+                totals[key] += row['line'].get(key, 0)
+
+    return calculate(player['kind'], totals)
