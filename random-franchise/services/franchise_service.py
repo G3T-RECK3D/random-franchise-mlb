@@ -98,3 +98,86 @@ def save_settings(repo, fid, values):
         before = settings(repo, fid)
         repo.put('settings', dict(id=fid, franchise_id=fid, values=values))
         audit(repo, fid, 'settings', before, values, 'Settings editor')
+def setup_recovered_seasons(repo, fid):
+    """Prepare an empty franchise for two recovered Event seasons."""
+    with repo.transaction():
+        f = repo.get('franchises', fid)
+        if not f:
+            raise RuleError('Select a valid franchise.')
+
+        if repo.list('runs', fid) or repo.list('games', fid):
+            raise RuleError(
+                'Season recovery setup must happen before adding weeks or games.'
+            )
+
+        seasons = repo.list('seasons', fid)
+        names = [
+            '2026 Wildcard Series Event',
+            '2026 Division Series Event',
+        ]
+
+        # Repeating the setup leaves the existing season records unchanged.
+        if len(seasons) == 2:
+            ordered = sorted(seasons, key=lambda s: s['number'])
+            if (
+                [s['number'] for s in ordered] == [1, 2]
+                and [s['event'] for s in ordered] == names
+                and ordered[0]['status'] == 'completed'
+                and ordered[1]['status'] == 'active'
+                and f.get('current_season') == ordered[1]['id']
+            ):
+                return
+            raise RuleError('This franchise already has a different season setup.')
+
+        if len(seasons) > 1:
+            raise RuleError('This franchise already has multiple seasons.')
+
+        if seasons:
+            first = dict(seasons[0])
+            if first.get('mvp'):
+                raise RuleError('The existing season already has an MVP.')
+        else:
+            first = dict(id=uid(), franchise_id=fid, created_at=now())
+
+        before = dict(franchise=dict(f), seasons=seasons)
+
+        first.update(
+            number=1,
+            name=names[0],
+            event=names[0],
+            status='completed',
+            started_at=None,
+            ended_at=None,
+            mvp=None,
+            recovered=True,
+        )
+
+        second = dict(
+            id=uid(),
+            franchise_id=fid,
+            number=2,
+            name=names[1],
+            event=names[1],
+            status='active',
+            created_at=now(),
+            started_at=None,
+            ended_at=None,
+            mvp=None,
+            recovered=True,
+        )
+
+        repo.put('seasons', first)
+        repo.put('seasons', second)
+
+        f.update(
+            current_season=second['id'],
+            event=names[1],
+        )
+        repo.put('franchises', f)
+
+        audit(
+            repo, fid, 'setup_recovered_seasons',
+            before,
+            dict(franchise=f, seasons=[first, second]),
+            'Restore season structure before importing historical games.',
+        )
