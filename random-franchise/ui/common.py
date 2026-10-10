@@ -100,10 +100,41 @@ def context(title, obs=False):
     f = repo.get('franchises',chosen)
     if not obs:
         st.title(title)
-        run=repo.get('runs',f['current_run']) if f['current_run'] else None
-        st.caption(f"{f['name']} · {f['event']} · {f['state']} · {'🔒 Roster locked' if locked(repo,chosen) else 'Roster unlocked'}")
+
+        run = (
+            repo.get('runs', f['current_run'])
+            if f['current_run'] else None
+        )
+        season_id = (
+            run.get('season_id') if run else None
+        ) or f.get('current_season')
+        season = (
+            repo.get('seasons', season_id)
+            if season_id else None
+        )
+
+        roster_status = (
+            '🔒 Roster locked'
+            if locked(repo, chosen) else 'Roster unlocked'
+        )
+        st.caption(
+            f"{f['name']} · {f['state']} · {roster_status}"
+        )
+
+        if season:
+            st.markdown(
+                f"**Season {season['number']} · {season['name']}**"
+            )
+        else:
+            st.caption(f['event'])
+
         if run:
-            st.markdown(f"**Run {run['number']} · {run['wins']}–{run['losses']}**")
+            week = run.get('week_number', run['number'])
+            st.markdown(
+                f"**Week {week} · {run['wins']}–{run['losses']}**"
+            )
+        elif season:
+            st.caption('No week started yet.')
     return repo,f
 
 def run_page(title, renderer, obs=False):
