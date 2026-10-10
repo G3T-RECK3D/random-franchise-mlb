@@ -9,8 +9,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Protocol
 
-TABLES = ('franchises', 'runs', 'players', 'games', 'stats', 'spins', 'moves',
-          'rewards', 'challenges', 'snapshots', 'corrections', 'tags', 'wheels', 'settings')
+TABLES = (
+    'franchises', 'runs', 'players', 'games', 'stats', 'spins', 'moves',
+    'rewards', 'challenges', 'snapshots', 'corrections', 'tags',
+    'wheels', 'settings', 'seasons',
+)
 IMMUTABLE = {'spins', 'corrections', 'snapshots'}
 
 class Repository(Protocol):
