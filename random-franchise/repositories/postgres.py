@@ -61,6 +61,22 @@ class PostgresRepository:
                 (f'{SCHEMA}.settings',),
             ).fetchone()[0]
             if ready:
+                self.connection.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {SCHEMA}.seasons (
+                        sequence BIGINT GENERATED ALWAYS AS IDENTITY,
+                        id TEXT PRIMARY KEY,
+                        franchise_id TEXT,
+                        run_id TEXT,
+                        payload TEXT NOT NULL
+                            CHECK (
+                                jsonb_typeof(payload::jsonb) = 'object'
+                            )
+                    )
+                """)
+                self.connection.execute(f"""
+                    CREATE INDEX IF NOT EXISTS ix_seasons_owner
+                    ON {SCHEMA}.seasons(franchise_id, run_id)
+                """)
                 return
 
             self.connection.execute(
