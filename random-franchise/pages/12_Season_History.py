@@ -147,6 +147,46 @@ def render(repo, f):
         with st.expander('All season pitching stats'):
             table(pitchers)
 
+    with st.expander('Restore a completed historical week'):
+        import json
+        from models.domain import RuleError
+        from services.historical_import import import_completed_week
+
+        st.write(
+            f"Import destination: Season {season['number']} "
+            f"— {season['name']}"
+        )
+        st.caption(
+            'Restores games and player stats without replaying wheels '
+            'or rewards. Missing statistics remain marked as unavailable.'
+        )
+
+        upload = st.file_uploader(
+            'Historical week JSON',
+            type=['json'],
+            key='historical_upload:' + fid + ':' + selected,
+        )
+        confirmed = st.checkbox(
+            'I verified the selected season and week being restored.',
+            key='historical_confirm:' + fid + ':' + selected,
+        )
+
+        if st.button(
+            'Import historical week',
+            disabled=upload is None or not confirmed,
+            key='historical_import:' + fid + ':' + selected,
+        ):
+            try:
+                payload = json.loads(
+                    upload.getvalue().decode('utf-8-sig')
+                )
+                import_completed_week(repo, fid, selected, payload)
+            except (ValueError, UnicodeError):
+                st.error('The uploaded file is not valid JSON.')
+            except RuleError as exc:
+                st.error(str(exc))
+            else:
+                st.rerun()
     st.subheader('Weekly results')
     rows = []
     for week in weeks:
