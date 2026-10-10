@@ -35,40 +35,6 @@ def context(title, obs=False):
     authorize()
     repo = PostgresRepository(st.secrets['postgres'])
     rows = repo.list('franchises')
-    with st.expander('Temporary database check'):
-        st.write('Current database:', str(Path(repo_path()).resolve()))
-        st.write('Franchises found:', [r['name'] for r in rows])
-
-        if st.button('Look for other database files'):
-            import sqlite3
-
-            candidates = {Path(repo_path()).resolve()}
-            for pattern in ['*.db', '*.sqlite', '*.sqlite3']:
-                candidates.update(ROOT.parent.rglob(pattern))
-
-            for path in sorted(candidates):
-                connection = None
-                try:
-                    connection = sqlite3.connect(
-                        path.resolve().as_uri() + '?mode=ro',
-                        uri=True,
-                        timeout=5,
-                    )
-                    records = connection.execute(
-                        'SELECT payload FROM franchises'
-                    ).fetchall()
-
-                    import json
-                    names = [
-                        json.loads(row[0]).get('name', 'Unnamed')
-                        for row in records
-                    ]
-                    st.write(str(path), names)
-                except (sqlite3.Error, ValueError, OSError) as exc:
-                    st.caption(str(path) + ': ' + str(exc))
-                finally:
-                    if connection is not None:
-                        connection.close()
     if not obs:
         st.sidebar.title('⚾ Random Franchise')
     if not rows:
