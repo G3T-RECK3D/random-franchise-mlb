@@ -15,22 +15,88 @@ def start_run(repo, fid):
     with repo.transaction():
         f = repo.get('franchises', fid)
         if f['state'] not in [State.SETUP, State.READY, State.VALIDATION]:
-            raise RuleError('Finish the current workflow before starting a run.')
+            raise RuleError(
+                'Finish the current workflow before starting a week.'
+            )
+
+        season = (
+            repo.get('seasons', f['current_season'])
+            if f.get('current_season') else None
+        )
+        if (
+            not season
+            or season['franchise_id'] != fid
+            or season['status'] != 'active'
+        ):
+            raise RuleError(
+                'Set up an active season before starting a week.'
+            )
+
         errors = validate(repo, fid).errors
         if errors:
             raise RuleError('\n'.join(errors))
+
         cfg = settings(repo, fid)
         rid = uid()
-        active = [p['id'] for p in repo.list('players', fid) if p['area'] in ACTIVE_AREAS]
-        repo.put('runs', dict(id=rid, franchise_id=fid, number=len(repo.list('runs', fid)) + 1,
-            event=f['event'], wins=0, losses=0, max_losses=cfg['max_losses'], settings=cfg,
-            roster_ids=active, started_at=now(), ended_at=None, mvp=None, offseason_step=None))
-        f.update(current_run=rid, state=State.ACTIVE, queue=[], return_state=State.ACTIVE)
+        runs = repo.list('runs', fid)
+        season_runs = [
+            r for r in runs
+            if r.get('season_id') == season['id']
+        ]
+
+        # Keep a franchise-wide number for existing game rules.
+        number = max(
+            (r['number'] for r in runs),
+            default=0,
+        ) + 1
+
+        # Week numbering starts over with each season.
+        week_number = max(
+            (r.get('week_number', 0) for r in season_runs),
+            default=0,
+        ) + 1
+
+        active = [
+            p['id'] for p in repo.list('players', fid)
+            if p['area'] in ACTIVE_AREAS
+        ]
+
+        repo.put('runs', dict(
+            id=rid,
+            franchise_id=fid,
+            number=number,
+            season_id=season['id'],
+            week_number=week_number,
+            event=season['event'],
+            wins=0,
+            losses=0,
+            max_losses=cfg['max_losses'],
+            settings=cfg,
+            roster_ids=active,
+            started_at=now(),
+            ended_at=None,
+            mvp=None,
+            offseason_step=None,
+        ))
+
+        f.update(
+            current_run=rid,
+            event=season['event'],
+            state=State.ACTIVE,
+            queue=[],
+            return_state=State.ACTIVE,
+        )
         repo.put('franchises', f)
+
         for c in repo.list('challenges', fid):
             if c['status'] == 'waiting_next_run':
-                c.update(run_id=rid, status='active', source_game=None)
+                c.update(
+                    run_id=rid,
+                    status='active',
+                    source_game=None,
+                )
                 repo.put('challenges', c)
+
         snapshot(repo, fid, rid, 'start')
         return rid
 
