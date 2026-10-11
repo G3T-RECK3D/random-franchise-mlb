@@ -1,10 +1,13 @@
 import random
+
 from models.domain import RuleError, State, now, uid
 from services.game_engine import enqueue
 from services.franchise_service import settings
 from services.roster_service import target_pool, protected
 from services.stat_engine import aggregate
 from services.challenge_service import create
+from services.reunion_service import reunion_pool
+
 
 def trade_position_options(kind):
     if kind == 'hitter':
@@ -111,32 +114,79 @@ def trade_market_options():
         for index, (label, teams) in enumerate(markets.items())
     ]
 
+
 def current_job(repo, fid):
-    f = repo.get('franchises', fid)
-    return f['queue'][0] if f['queue'] else None
+    franchise = repo.get('franchises', fid)
+    return franchise['queue'][0] if franchise['queue'] else None
 
 
 def _targets(repo, fid, wedge):
     eligibility = wedge.get('eligibility', {})
+
+    if wedge.get('effect') == 'reunion':
+        pool = reunion_pool(repo, fid)
+        if eligibility.get('kind'):
+            pool = [
+                player for player in pool
+                if player['kind'] == eligibility['kind']
+            ]
+        return pool
+
     pool = target_pool(repo, fid, eligibility.get('kind'))
-    if wedge.get('effect') in ['hot_seat', 'protect', 'challenge', 'arrangement']:
-        pool = [p for p in repo.list('players', fid) if p['area'] in ['lineup', 'bench', 'rotation', 'bullpen'] and (not eligibility.get('kind') or p['kind'] == eligibility['kind'])]
+
+    if wedge.get('effect') in [
+        'hot_seat', 'protect', 'challenge', 'arrangement',
+    ]:
+        pool = [
+            player
+            for player in repo.list('players', fid)
+            if player['area'] in [
+                'lineup', 'bench', 'rotation', 'bullpen',
+            ]
+            and (
+                not eligibility.get('kind')
+                or player['kind'] == eligibility['kind']
+            )
+        ]
+
     if wedge.get('effect') == 'unprotect':
-        pool = [p for p in repo.list('players', fid) if p.get('protected')]
+        pool = [
+            player for player in repo.list('players', fid)
+            if player.get('protected')
+        ]
+
     if eligibility.get('area'):
-        pool = [p for p in pool if p['area'] == eligibility['area']]
+        pool = [
+            player for player in pool
+            if player['area'] == eligibility['area']
+        ]
+
     if eligibility.get('hot_seat'):
-        pool = [p for p in pool if p.get('hot_seat')]
+        pool = [
+            player for player in pool if player.get('hot_seat')
+        ]
+
     if eligibility.get('failed_challenge'):
-        failed = {c['player_id'] for c in repo.list('challenges', fid) if c['status'] == 'failed'}
-        pool = [p for p in pool if p['id'] in failed]
+        failed = {
+            challenge['player_id']
+            for challenge in repo.list('challenges', fid)
+            if challenge['status'] == 'failed'
+        }
+        pool = [
+            player for player in pool if player['id'] in failed
+        ]
+
     return pool
 
 
-def _performance(repo, fid, p):
-    f = repo.get('franchises', fid)
-    t = aggregate(repo, fid, p, f['current_run'])
-    return t.get('ops', 0) if p['kind'] == 'hitter' else -t.get('era', 0)
+def _performance(repo, fid, player):
+    franchise = repo.get('franchises', fid)
+    totals = aggregate(repo, fid, player, franchise['current_run'])
+    return (
+        totals.get('ops', 0)
+        if player['kind'] == 'hitter'
+        else -totals.get('era', 0)
+    )
 
 
 def available(repo, fid, job):
@@ -150,64 +200,186 @@ def available(repo, fid, job):
     wheel = repo.get('wheels', f"{fid}:{job['wheel_id']}")
     if not wheel:
         raise RuleError('Wheel configuration missing.')
-    options = []
+
     if job['wheel_id'] == 'dfa_target':
-        pool = sorted(target_pool(repo, fid), key=lambda p: (_performance(repo, fid, p), p['ovr']))[:3]
-        return [dict(id=p['id'], text='DFA ' + p['name'], weight=1, active=True, effect='dfa',
-                     selector='fixed', target_id=p['id'], eligibility={'needs_target': True}, description='Bottom-three eligible player') for p in pool]
-    for w in wheel['wedges']:
-        if not settings(repo, fid).get('special_wheels', True) and w.get('follow_up') in ['premium', 'tag_hitter', 'tag_pitcher']:
+        pool = sorted(
+            target_pool(repo, fid),
+            key=lambda player: (
+                _performance(repo, fid, player), player['ovr'],
+            ),
+        )[:3]
+        return [
+            dict(
+                id=player['id'],
+                text='DFA ' + player['name'],
+                weight=1,
+                active=True,
+                effect='dfa',
+                selector='fixed',
+                target_id=player['id'],
+                eligibility={'needs_target': True},
+                description='Bottom-three eligible player',
+            )
+            for player in pool
+        ]
+
+    cfg = settings(repo, fid)
+    options = []
+
+    for wedge in wheel['wedges']:
+        if (
+            not cfg.get('special_wheels', True)
+            and wedge.get('follow_up') in [
+                'premium', 'tag_hitter', 'tag_pitcher',
+            ]
+        ):
             continue
-        if not w.get('active', True) or w.get('weight', 1) <= 0:
+
+        if (
+            not wedge.get('active', True)
+            or wedge.get('weight', 1) <= 0
+        ):
             continue
-        if job.get('depth', 0) >= 4 and (w.get('follow_up') or w.get('effect') == 'extra_spin'):
-            continue  # bounded recursive bonus chains
-        e = w.get('eligibility', {})
-        if e.get('kind') and job.get('target'):
-            p = repo.get('players', job['target'])
-            if p and p['kind'] != e['kind']:
+
+        if job.get('depth', 0) >= 4 and (
+            wedge.get('follow_up')
+            or wedge.get('effect') == 'extra_spin'
+        ):
+            continue
+
+        eligibility = wedge.get('eligibility', {})
+
+        if wedge.get('effect') == 'reunion':
+            if (
+                wedge.get('quantity', 1) != 1
+                or wedge.get('follow_up')
+                or not _targets(repo, fid, wedge)
+            ):
                 continue
-        if e.get('needs_target') and len(_targets(repo, fid, w)) < w.get('quantity', 1):
+        elif eligibility.get('kind') and job.get('target'):
+            player = repo.get('players', job['target'])
+            if player and player['kind'] != eligibility['kind']:
+                continue
+
+        if (
+            eligibility.get('needs_target')
+            and len(_targets(repo, fid, wedge))
+            < wedge.get('quantity', 1)
+        ):
             continue
-        if e.get('needs_bench') and not any(p['area'] == 'bench' for p in repo.list('players', fid)):
+
+        if eligibility.get('needs_bench') and not any(
+            player['area'] == 'bench'
+            for player in repo.list('players', fid)
+        ):
             continue
-        if e.get('needs_protection') and not any(p.get('protected') for p in repo.list('players', fid)):
+
+        if eligibility.get('needs_protection') and not any(
+            player.get('protected')
+            for player in repo.list('players', fid)
+        ):
             continue
-        options.append(dict(w))
+
+        options.append(dict(wedge))
+
     return options
 
 
 def _choose_target(repo, fid, wedge, job):
     pool = _targets(repo, fid, wedge)
+
+    # Reunion chooses from former cards, never an inherited active target.
+    if wedge.get('effect') == 'reunion':
+        return random.SystemRandom().choice(pool) if pool else None
+
     if wedge.get('target_id'):
-        return next((p for p in pool if p['id'] == wedge['target_id']), None)
+        return next(
+            (
+                player for player in pool
+                if player['id'] == wedge['target_id']
+            ),
+            None,
+        )
+
     if job.get('target'):
         target = repo.get('players', job['target'])
-        if target and (wedge.get('effect') not in ['dfa', 'demote', 'trade'] or not protected(repo, fid, target)):
+        if target and (
+            wedge.get('effect') not in ['dfa', 'demote', 'trade']
+            or not protected(repo, fid, target)
+        ):
             return target
+
     if not pool:
         return None
+
     selector = wedge.get('selector', 'random')
     if selector == 'lowest':
-        return min(pool, key=lambda p: p['ovr'])
+        return min(pool, key=lambda player: player['ovr'])
     if selector == 'highest':
-        return max(pool, key=lambda p: p['ovr'])
+        return max(pool, key=lambda player: player['ovr'])
     if selector == 'worst':
-        return min(pool, key=lambda p: (_performance(repo, fid, p), p['ovr']))
+        return min(
+            pool,
+            key=lambda player: (
+                _performance(repo, fid, player), player['ovr'],
+            ),
+        )
     if selector == 'bottom3':
-        pool = sorted(pool, key=lambda p: (_performance(repo, fid, p), p['ovr']))[:3]
+        pool = sorted(
+            pool,
+            key=lambda player: (
+                _performance(repo, fid, player), player['ovr'],
+            ),
+        )[:3]
+
     return random.SystemRandom().choice(pool)
 
 
-def _bank(repo, fid, job, spin, wedge, target):
-    key = f"move:{spin['id']}"
+def _bank(repo, fid, job, saved_spin, wedge, target):
+    key = f"move:{saved_spin['id']}"
+    if repo.get('moves', key):
+        return
+
     kind = wedge.get('effect', 'acquire')
-    repo.put('moves', dict(id=key, franchise_id=fid, run_id=spin['run_id'], game_id=job.get('game_id'),
-        created_at=now(), source=job['source'], spin_id=spin['id'], type=kind,
-        target=target['id'] if target else None, description=wedge['text'],
-        constraints={'instruction': wedge.get('description', wedge['text']), 'branch': list(job.get('constraints', [])),
-                     'quantity': wedge.get('quantity', 1)}, status='pending',
-        critical=kind in ['dfa', 'demote', 'trade', 'tag'], resolution_notes=''))
+    constraints = {
+        'instruction': wedge.get('description', wedge['text']),
+        'branch': list(job.get('constraints', [])),
+        'quantity': wedge.get('quantity', 1),
+    }
+    description = wedge['text']
+
+    if kind == 'reunion':
+        if not target or target['franchise_id'] != fid:
+            raise RuleError('The selected reunion card is unavailable.')
+        constraints.update(
+            player_id=target['id'],
+            card_uuid=target.get('card_uuid'),
+            kind=target['kind'],
+            ovr=target['ovr'],
+            version=target.get('version', ''),
+            series=target.get('series', ''),
+        )
+        description += (
+            ' · ' + target['name']
+            + ' · ' + str(target['ovr']) + ' OVR'
+        )
+
+    repo.put('moves', dict(
+        id=key,
+        franchise_id=fid,
+        run_id=saved_spin['run_id'],
+        game_id=job.get('game_id'),
+        created_at=now(),
+        source=job['source'],
+        spin_id=saved_spin['id'],
+        type=kind,
+        target=target['id'] if target else None,
+        description=description,
+        constraints=constraints,
+        status='pending',
+        critical=kind in ['dfa', 'demote', 'trade', 'tag'],
+        resolution_notes='',
+    ))
 
 
 def spin(repo, fid, job_id):
@@ -217,28 +389,59 @@ def spin(repo, fid, job_id):
             if existing['franchise_id'] != fid:
                 raise RuleError('Spin belongs to another franchise.')
             return existing
-        f = repo.get('franchises', fid)
+
+        franchise = repo.get('franchises', fid)
         job = current_job(repo, fid)
-        if f['state'] != State.WHEEL or not job or job['id'] != job_id:
+        if (
+            franchise['state'] != State.WHEEL
+            or not job
+            or job['id'] != job_id
+        ):
             raise RuleError('This spin is not the current required action.')
+
         options = available(repo, fid, job)
-        # Impossible nested branch: preserve parent result and only void this child.
         if not options:
-            outcome = dict(id='impossible', text='No eligible options — branch deferred', effect='deferred')
+            outcome = dict(
+                id='impossible',
+                text='No eligible options — branch deferred',
+                effect='deferred',
+            )
         else:
-            outcome = random.SystemRandom().choices(options, weights=[w.get('weight', 1) for w in options], k=1)[0]
+            outcome = random.SystemRandom().choices(
+                options,
+                weights=[wedge.get('weight', 1) for wedge in options],
+                k=1,
+            )[0]
+
         target = _choose_target(repo, fid, outcome, job)
-        record = dict(id=job_id, franchise_id=fid, run_id=f['current_run'], game_id=job.get('game_id'),
-            wheel_id=job['wheel_id'], result=outcome, available=options, target=target['id'] if target else None,
-            created_at=now(), reroll_reason='Impossible child only' if not options else job.get('reroll_reason'),
-            admin_note='', job=dict(job), parent_spin=job.get('parent_spin'))
+        if outcome.get('effect') == 'reunion' and not target:
+            raise RuleError('No eligible former card is available.')
+
+        record = dict(
+            id=job_id,
+            franchise_id=fid,
+            run_id=franchise['current_run'],
+            game_id=job.get('game_id'),
+            wheel_id=job['wheel_id'],
+            result=outcome,
+            available=options,
+            target=target['id'] if target else None,
+            created_at=now(),
+            reroll_reason=(
+                'Impossible child only'
+                if not options else job.get('reroll_reason')
+            ),
+            admin_note='',
+            job=dict(job),
+            parent_spin=job.get('parent_spin'),
+        )
         repo.put('spins', record)
         return record
+
 
 def _bank_trade_result(repo, fid, saved_spin, context):
     original = context['original_result']
     key = 'move:' + context['original_spin_id']
-
     if repo.get('moves', key):
         return
 
@@ -275,8 +478,11 @@ def _bank_trade_result(repo, fid, saved_spin, context):
         critical=True,
         resolution_notes='',
     ))
-def _queue_trade_step(repo, fid, franchise, job, saved_spin,
-                      wheel_id, context):
+
+
+def _queue_trade_step(
+    repo, fid, franchise, job, saved_spin, wheel_id, context,
+):
     enqueue(
         franchise,
         wheel_id,
@@ -285,76 +491,98 @@ def _queue_trade_step(repo, fid, franchise, job, saved_spin,
         context['target'],
         job.get('depth', 0) + 1,
     )
-
     next_job = franchise['queue'].pop()
     next_job['trade_context'] = dict(context)
     next_job['constraints'] = list(job.get('constraints', []))
     next_job['parent_spin'] = saved_spin['id']
     franchise['queue'].insert(0, next_job)
 
+
 def continue_spin(repo, fid, job_id, acknowledged=False):
     with repo.transaction():
-        f = repo.get('franchises', fid)
+        franchise = repo.get('franchises', fid)
         job = current_job(repo, fid)
         if not job or job['id'] != job_id:
-            return  # repeated Continue is harmless
-        s = repo.get('spins', job_id)
-        if not s:
+            return
+
+        saved_spin = repo.get('spins', job_id)
+        if not saved_spin:
             raise RuleError('Spin the wheel first.')
-        w = s['result']
-        effect = w.get('effect', 'acquire')
+
+        wedge = saved_spin['result']
+        effect = wedge.get('effect', 'acquire')
+
         if effect == 'arrangement' and not acknowledged:
-            raise RuleError('Apply the legal arrangement in Roster Manager and confirm it before continuing.')
-        f['queue'].pop(0)
-        target = repo.get('players', s['target']) if s.get('target') else None
-        follow = w.get('follow_up')
+            raise RuleError(
+                'Apply the legal arrangement in Roster Manager '
+                'and confirm it before continuing.'
+            )
+
+        target = (
+            repo.get('players', saved_spin['target'])
+            if saved_spin.get('target') else None
+        )
+        if effect == 'reunion' and (
+            not target or target['franchise_id'] != fid
+        ):
+            raise RuleError('The selected reunion card is unavailable.')
+
+        franchise['queue'].pop(0)
+        follow = wedge.get('follow_up')
+
         if follow:
-            children = w.get('quantity', 1)
+            children = wedge.get('quantity', 1)
             for _ in range(children):
-                enqueue(f, follow, job['source'], job.get('game_id'), job.get('target'), job.get('depth', 0) + 1)
-                f['queue'][-1]['constraints'] = job.get('constraints', []) + [w['text']]
-                f['queue'][-1]['parent_spin'] = s['id']
-            # Keep nested branch before unrelated milestone jobs.
-            new = f['queue'][-children:]
-            f['queue'] = new + f['queue'][:-children]
+                enqueue(
+                    franchise, follow, job['source'],
+                    job.get('game_id'), job.get('target'),
+                    job.get('depth', 0) + 1,
+                )
+                franchise['queue'][-1]['constraints'] = (
+                    job.get('constraints', []) + [wedge['text']]
+                )
+                franchise['queue'][-1]['parent_spin'] = saved_spin['id']
+
+            new = franchise['queue'][-children:]
+            franchise['queue'] = new + franchise['queue'][:-children]
+
         elif effect == 'trade_market':
             context = dict(job['trade_context'])
-            context['teams'] = list(w['teams'])
-            context['market_label'] = w['text']
+            context['teams'] = list(wedge['teams'])
+            context['market_label'] = wedge['text']
             _queue_trade_step(
-                repo, fid, f, job, s, 'trade_position', context
+                repo, fid, franchise, job, saved_spin,
+                'trade_position', context,
             )
-            f['queue'][0]['constraints'].append(
-                'Incoming market: ' + w['text']
+            franchise['queue'][0]['constraints'].append(
+                'Incoming market: ' + wedge['text']
             )
 
         elif effect == 'trade_position':
             context = dict(job['trade_context'])
-            context['positions'] = list(w['positions'])
-            context['position_label'] = w['text']
-            _bank_trade_result(repo, fid, s, context)
+            context['positions'] = list(wedge['positions'])
+            context['position_label'] = wedge['text']
+            _bank_trade_result(repo, fid, saved_spin, context)
 
         elif effect == 'trade':
             if not target:
                 raise RuleError('This trade needs an outgoing player.')
-            if w.get('quantity', 1) != 1:
+            if wedge.get('quantity', 1) != 1:
                 raise RuleError(
                     'The new trade sequence supports one outgoing player.'
                 )
 
-            title = w['text'].strip().casefold()
+            title = wedge['text'].strip().casefold()
             forced = (
                 'forced trade' in title
                 or title in [
-                    'trade random starter',
-                    'future trade candidate',
+                    'trade random starter', 'future trade candidate',
                 ]
                 or job['wheel_id'] in ['elimination', 'meltdown']
             )
-
             context = {
-                'original_spin_id': s['id'],
-                'original_result': dict(w),
+                'original_spin_id': saved_spin['id'],
+                'original_result': dict(wedge),
                 'target': target['id'],
                 'kind': target['kind'],
                 'max_ovr': target['ovr'] if forced else None,
@@ -363,56 +591,113 @@ def continue_spin(repo, fid, job_id, acknowledged=False):
                 'branch': list(job.get('constraints', [])),
             }
             _queue_trade_step(
-                repo, fid, f, job, s, 'trade_market', context
+                repo, fid, franchise, job, saved_spin,
+                'trade_market', context,
             )
-            f['queue'][0]['constraints'].append(
-                'Original trade: ' + w['text']
+            franchise['queue'][0]['constraints'].append(
+                'Original trade: ' + wedge['text']
             )
+
+        elif effect == 'reunion':
+            _bank(repo, fid, job, saved_spin, wedge, target)
+
         elif effect == 'extra_spin':
-            for _ in range(w.get('quantity', 1)):
-                enqueue(f, job['wheel_id'], job['source'], job.get('game_id'), job.get('target'), job.get('depth', 0) + 1)
-        elif effect == 'protect' and 'Next Run' in w['text']:
-            _bank(repo, fid, job, s, w, target)
+            for _ in range(wedge.get('quantity', 1)):
+                enqueue(
+                    franchise, job['wheel_id'], job['source'],
+                    job.get('game_id'), job.get('target'),
+                    job.get('depth', 0) + 1,
+                )
+
+        elif effect == 'protect' and 'Next Run' in wedge['text']:
+            _bank(repo, fid, job, saved_spin, wedge, target)
+
         elif effect in ['hot_seat', 'protect', 'unprotect']:
             if target:
-                target['hot_seat' if effect == 'hot_seat' else 'protected'] = effect != 'unprotect'
+                field = 'hot_seat' if effect == 'hot_seat' else 'protected'
+                target[field] = effect != 'unprotect'
                 repo.put('players', target)
-                if effect == 'hot_seat' and w.get('quantity', 1) > 1:
-                    extra = [p for p in _targets(repo, fid, w) if p['id'] != target['id']][:w['quantity'] - 1]
-                    for p in extra:
-                        p['hot_seat'] = True
-                        repo.put('players', p)
+
+                if effect == 'hot_seat' and wedge.get('quantity', 1) > 1:
+                    extra = [
+                        player for player in _targets(repo, fid, wedge)
+                        if player['id'] != target['id']
+                    ][:wedge['quantity'] - 1]
+                    for player in extra:
+                        player['hot_seat'] = True
+                        repo.put('players', player)
+
         elif effect == 'challenge' and target:
-            create(repo, fid, f['current_run'], target['id'], w['text'], w.get('metric'), w.get('threshold', 1),
-                   w.get('scope', 'next_game'), w.get('reward', 'protection'), job.get('game_id'))
+            create(
+                repo, fid, franchise['current_run'], target['id'],
+                wedge['text'], wedge.get('metric'),
+                wedge.get('threshold', 1),
+                wedge.get('scope', 'next_game'),
+                wedge.get('reward', 'protection'),
+                job.get('game_id'),
+            )
+
         elif effect == 'tag' and target:
             from services.franchise_tag_service import grant
-            if grant(repo, fid, target['id'], source=w['text']) == 'cap_decision_required':
-                _bank(repo, fid, job, s, w, target)
+
+            if grant(
+                repo, fid, target['id'], source=wedge['text'],
+            ) == 'cap_decision_required':
+                _bank(repo, fid, job, saved_spin, wedge, target)
+
         elif effect == 'arrangement':
             from services.franchise_service import audit
-            audit(repo, fid, 'manual_wheel_arrangement', None, w, 'Creator confirms legal in-game arrangement', f['current_run'])
+
+            audit(
+                repo, fid, 'manual_wheel_arrangement', None, wedge,
+                'Creator confirms legal in-game arrangement',
+                franchise['current_run'],
+            )
+
         elif effect not in ['none', 'challenge']:
-            _bank(repo, fid, job, s, w, target)
+            _bank(repo, fid, job, saved_spin, wedge, target)
             if effect == 'deferred':
-                m = repo.get('moves', f"move:{s['id']}")
-                m.update(status='deferred', critical=False)
-                repo.put('moves', m)
-        f['state'] = State.WHEEL if f['queue'] else f['return_state']
-        repo.put('franchises', f)
+                move = repo.get('moves', f"move:{saved_spin['id']}")
+                move.update(status='deferred', critical=False)
+                repo.put('moves', move)
+
+        franchise['state'] = (
+            State.WHEEL if franchise['queue']
+            else franchise['return_state']
+        )
+        repo.put('franchises', franchise)
 
 
 def retry_impossible_branch(repo, fid, job_id):
-    """Only an impossible nested child may be retried, and only once eligible options exist."""
+    """Retry an impossible child only after eligible options exist."""
     with repo.transaction():
-        f = repo.get('franchises', fid)
+        franchise = repo.get('franchises', fid)
         job = current_job(repo, fid)
         original = repo.get('spins', job_id)
-        if not job or job['id'] != job_id or not original or original['result']['id'] != 'impossible' or not job.get('parent_spin'):
-            raise RuleError('Only an impossible nested branch has retry permission.')
+
+        if (
+            not job
+            or job['id'] != job_id
+            or not original
+            or original['result']['id'] != 'impossible'
+            or not job.get('parent_spin')
+        ):
+            raise RuleError(
+                'Only an impossible nested branch has retry permission.'
+            )
+
         if not available(repo, fid, job):
-            raise RuleError('This branch still has no eligible options. Defer it instead.')
-        replacement = dict(job, id=uid(), reroll_reason='Retry of impossible nested branch', retried_spin=job_id)
-        f['queue'][0] = replacement
-        repo.put('franchises', f)
+            raise RuleError(
+                'This branch still has no eligible options. '
+                'Defer it instead.'
+            )
+
+        replacement = dict(
+            job,
+            id=uid(),
+            reroll_reason='Retry of impossible nested branch',
+            retried_spin=job_id,
+        )
+        franchise['queue'][0] = replacement
+        repo.put('franchises', franchise)
         return replacement['id']
