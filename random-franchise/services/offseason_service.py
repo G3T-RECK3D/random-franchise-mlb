@@ -1,12 +1,21 @@
-import random
+from models.domain import State, RuleError, now, ACTIVE_AREAS, POSITIONS
+from services.game_engine import enqueue, snapshot
+from services.roster_service import (
+    locked,
+    remove_player,
+    add_player,
+    arrange,
+    protected,
+    target_pool,
+)
+from services.franchise_tag_service import grant
+from services.franchise_service import audit, settings
+from services.roster_validator import (
+    validate,
+    legal_positions,
+    card_event_errors,
+)
 
-from models.domain import RuleError, State, now, uid
-from services.game_engine import enqueue
-from services.franchise_service import settings
-from services.roster_service import target_pool, protected
-from services.stat_engine import aggregate
-from services.challenge_service import create
-from services.reunion_service import reunion_pool
 
 def confirm_end(repo, fid):
     with repo.transaction():
@@ -23,696 +32,600 @@ def confirm_end(repo, fid):
 
         repo.put('runs', run)
         repo.put('franchises', f)
-        
-def trade_position_options(kind):
-    if kind == 'hitter':
-        groups = {
-            'Catcher': ['C'],
-            'First Base': ['1B'],
-            'Second Base': ['2B'],
-            'Third Base': ['3B'],
-            'Shortstop': ['SS'],
-            'Left Field': ['LF'],
-            'Center Field': ['CF'],
-            'Right Field': ['RF'],
-            'Designated Hitter': ['DH'],
-            'Infield': ['1B', '2B', '3B', 'SS'],
-            'Outfield': ['LF', 'CF', 'RF'],
-            'Corner Infield': ['1B', '3B'],
-            'Middle Infield': ['2B', 'SS'],
-        }
-    elif kind == 'pitcher':
-        groups = {
-            'Starting Pitcher': ['SP'],
-            'Relief Pitcher': ['RP'],
-            'Closing Pitcher': ['CP'],
-            'Any Reliever': ['RP', 'CP'],
-            'Any Pitcher': ['SP', 'RP', 'CP'],
-        }
-    else:
-        raise RuleError('Trade target must be a hitter or pitcher.')
-
-    return [
-        dict(
-            id='trade_position:' + str(index),
-            text=label,
-            weight=1,
-            active=True,
-            effect='trade_position',
-            positions=positions,
-            description='Incoming card primary position: '
-                        + ', '.join(positions),
-        )
-        for index, (label, positions) in enumerate(groups.items())
-    ]
 
 
-def trade_market_options():
-    divisions = {
-        'AL East': [
-            'Baltimore Orioles', 'Boston Red Sox', 'New York Yankees',
-            'Tampa Bay Rays', 'Toronto Blue Jays',
-        ],
-        'AL Central': [
-            'Chicago White Sox', 'Cleveland Guardians', 'Detroit Tigers',
-            'Kansas City Royals', 'Minnesota Twins',
-        ],
-        'AL West': [
-            'Athletics', 'Houston Astros', 'Los Angeles Angels',
-            'Seattle Mariners', 'Texas Rangers',
-        ],
-        'NL East': [
-            'Atlanta Braves', 'Miami Marlins', 'New York Mets',
-            'Philadelphia Phillies', 'Washington Nationals',
-        ],
-        'NL Central': [
-            'Chicago Cubs', 'Cincinnati Reds', 'Milwaukee Brewers',
-            'Pittsburgh Pirates', 'St. Louis Cardinals',
-        ],
-        'NL West': [
-            'Arizona Diamondbacks', 'Colorado Rockies',
-            'Los Angeles Dodgers', 'San Diego Padres',
-            'San Francisco Giants',
-        ],
-    }
+def select_mvp(repo, fid, pid):
+    with repo.transaction():
+        f = repo.get('franchises', fid)
+        if not f or f['state'] != State.MVP:
+            raise RuleError('Confirm the ended week before choosing MVP.')
 
-    markets = {}
-    for teams in divisions.values():
-        for team in teams:
-            markets[team] = [team]
+        run = repo.get('runs', f.get('current_run'))
+        if not run or pid not in run['roster_ids']:
+            raise RuleError('Select a player from the ended week.')
 
-    for division, teams in divisions.items():
-        markets[division] = list(teams)
+        player = repo.get('players', pid)
+        if not player or player['franchise_id'] != fid:
+            raise RuleError('The selected player is unavailable.')
 
-    for prefix, label in [
-        ('AL', 'American League'),
-        ('NL', 'National League'),
-    ]:
-        markets[label] = [
-            team
-            for division, teams in divisions.items()
-            if division.startswith(prefix)
-            for team in teams
-        ]
+        run.update(mvp=pid, offseason_step='elimination')
+        player['protected'] = True
 
-    return [
-        dict(
-            id='trade_market:' + str(index),
-            text=label,
-            weight=1,
-            active=True,
-            effect='trade_market',
-            teams=teams,
-            description='Choose an incoming card from: '
-                        + ', '.join(teams),
-        )
-        for index, (label, teams) in enumerate(markets.items())
-    ]
+        repo.put('players', player)
+        repo.put('runs', run)
+
+        enqueue(f, 'mvp', 'run_mvp', target=pid)
+        f.update(state=State.WHEEL, return_state=State.ELIMINATION)
+        repo.put('franchises', f)
 
 
-def current_job(repo, fid):
-    franchise = repo.get('franchises', fid)
-    return franchise['queue'][0] if franchise['queue'] else None
+def progress(repo, fid):
+    with repo.transaction():
+        f = repo.get('franchises', fid)
+        if not f:
+            raise RuleError('Franchise not found.')
 
+        run = repo.get('runs', f.get('current_run'))
+        if not run:
+            raise RuleError('No current week was found.')
 
-def _targets(repo, fid, wedge):
-    eligibility = wedge.get('eligibility', {})
+        if f['state'] == State.ELIMINATION:
+            enqueue(f, 'elimination', 'run_end')
+            f.update(state=State.WHEEL, return_state=State.MELTDOWN)
+            run['offseason_step'] = 'meltdown'
 
-    if wedge.get('effect') == 'reunion':
-        pool = reunion_pool(repo, fid)
-        if eligibility.get('kind'):
-            pool = [
-                player for player in pool
-                if player['kind'] == eligibility['kind']
-            ]
-        return pool
+        elif f['state'] == State.MELTDOWN:
+            mode = run['settings']['meltdown']
 
-    pool = target_pool(repo, fid, eligibility.get('kind'))
+            if run['wins'] == 0 and run['losses'] == 2 and mode != 'none':
+                enqueue(
+                    f,
+                    'meltdown' if mode == 'wheel' else 'elimination',
+                    '0–2 meltdown',
+                )
+                f.update(state=State.WHEEL, return_state=State.MOVES)
+            else:
+                f['state'] = State.MOVES
 
-    if wedge.get('effect') in [
-        'hot_seat', 'protect', 'challenge', 'arrangement',
-    ]:
-        pool = [
-            player
-            for player in repo.list('players', fid)
-            if player['area'] in [
-                'lineup', 'bench', 'rotation', 'bullpen',
-            ]
-            and (
-                not eligibility.get('kind')
-                or player['kind'] == eligibility['kind']
-            )
-        ]
+            run['offseason_step'] = 'moves'
 
-    if wedge.get('effect') == 'unprotect':
-        pool = [
-            player for player in repo.list('players', fid)
-            if player.get('protected')
-        ]
-
-    if eligibility.get('area'):
-        pool = [
-            player for player in pool
-            if player['area'] == eligibility['area']
-        ]
-
-    if eligibility.get('hot_seat'):
-        pool = [
-            player for player in pool if player.get('hot_seat')
-        ]
-
-    if eligibility.get('failed_challenge'):
-        failed = {
-            challenge['player_id']
-            for challenge in repo.list('challenges', fid)
-            if challenge['status'] == 'failed'
-        }
-        pool = [
-            player for player in pool if player['id'] in failed
-        ]
-
-    return pool
-
-
-def _performance(repo, fid, player):
-    franchise = repo.get('franchises', fid)
-    totals = aggregate(repo, fid, player, franchise['current_run'])
-    return (
-        totals.get('ops', 0)
-        if player['kind'] == 'hitter'
-        else -totals.get('era', 0)
-    )
-
-
-def available(repo, fid, job):
-    if job['wheel_id'] == 'trade_market':
-        return trade_market_options()
-
-    if job['wheel_id'] == 'trade_position':
-        kind = job.get('trade_context', {}).get('kind')
-        return trade_position_options(kind)
-
-    wheel = repo.get('wheels', f"{fid}:{job['wheel_id']}")
-    if not wheel:
-        raise RuleError('Wheel configuration missing.')
-
-    if job['wheel_id'] == 'dfa_target':
-        pool = sorted(
-            target_pool(repo, fid),
-            key=lambda player: (
-                _performance(repo, fid, player), player['ovr'],
-            ),
-        )[:3]
-        return [
-            dict(
-                id=player['id'],
-                text='DFA ' + player['name'],
-                weight=1,
-                active=True,
-                effect='dfa',
-                selector='fixed',
-                target_id=player['id'],
-                eligibility={'needs_target': True},
-                description='Bottom-three eligible player',
-            )
-            for player in pool
-        ]
-
-    cfg = settings(repo, fid)
-    options = []
-
-    for wedge in wheel['wedges']:
-        if (
-            not cfg.get('special_wheels', True)
-            and wedge.get('follow_up') in [
-                'premium', 'tag_hitter', 'tag_pitcher',
-            ]
-        ):
-            continue
-
-        if (
-            not wedge.get('active', True)
-            or wedge.get('weight', 1) <= 0
-        ):
-            continue
-
-        if job.get('depth', 0) >= 4 and (
-            wedge.get('follow_up')
-            or wedge.get('effect') == 'extra_spin'
-        ):
-            continue
-
-        eligibility = wedge.get('eligibility', {})
-
-        if wedge.get('effect') == 'reunion':
-            if (
-                wedge.get('quantity', 1) != 1
-                or wedge.get('follow_up')
-                or not _targets(repo, fid, wedge)
+        elif f['state'] == State.MOVES:
+            if any(
+                move['status'] == 'pending' and move.get('critical')
+                for move in repo.list('moves', fid)
             ):
-                continue
-        elif eligibility.get('kind') and job.get('target'):
-            player = repo.get('players', job['target'])
-            if player and player['kind'] != eligibility['kind']:
-                continue
+                raise RuleError(
+                    'Resolve all critical obligations before reconstruction.'
+                )
 
-        if (
-            eligibility.get('needs_target')
-            and len(_targets(repo, fid, wedge))
-            < wedge.get('quantity', 1)
-        ):
-            continue
+            if any(
+                challenge['status'] == 'awaiting_manual'
+                for challenge in repo.list('challenges', fid)
+            ):
+                raise RuleError('Confirm manual challenge evidence first.')
 
-        if eligibility.get('needs_bench') and not any(
-            player['area'] == 'bench'
-            for player in repo.list('players', fid)
-        ):
-            continue
+            f['state'] = State.REBUILD
+            run['offseason_step'] = 'rebuild'
 
-        if eligibility.get('needs_protection') and not any(
-            player.get('protected')
-            for player in repo.list('players', fid)
-        ):
-            continue
+        elif f['state'] == State.REBUILD:
+            f['state'] = State.VALIDATION
 
-        options.append(dict(wedge))
-
-    return options
-
-
-def _choose_target(repo, fid, wedge, job):
-    pool = _targets(repo, fid, wedge)
-
-    # Reunion chooses from former cards, never an inherited active target.
-    if wedge.get('effect') == 'reunion':
-        return random.SystemRandom().choice(pool) if pool else None
-
-    if wedge.get('target_id'):
-        return next(
-            (
-                player for player in pool
-                if player['id'] == wedge['target_id']
-            ),
-            None,
-        )
-
-    if job.get('target'):
-        target = repo.get('players', job['target'])
-        if target and (
-            wedge.get('effect') not in ['dfa', 'demote', 'trade']
-            or not protected(repo, fid, target)
-        ):
-            return target
-
-    if not pool:
-        return None
-
-    selector = wedge.get('selector', 'random')
-    if selector == 'lowest':
-        return min(pool, key=lambda player: player['ovr'])
-    if selector == 'highest':
-        return max(pool, key=lambda player: player['ovr'])
-    if selector == 'worst':
-        return min(
-            pool,
-            key=lambda player: (
-                _performance(repo, fid, player), player['ovr'],
-            ),
-        )
-    if selector == 'bottom3':
-        pool = sorted(
-            pool,
-            key=lambda player: (
-                _performance(repo, fid, player), player['ovr'],
-            ),
-        )[:3]
-
-    return random.SystemRandom().choice(pool)
-
-
-def _bank(repo, fid, job, saved_spin, wedge, target):
-    key = f"move:{saved_spin['id']}"
-    if repo.get('moves', key):
-        return
-
-    kind = wedge.get('effect', 'acquire')
-    constraints = {
-        'instruction': wedge.get('description', wedge['text']),
-        'branch': list(job.get('constraints', [])),
-        'quantity': wedge.get('quantity', 1),
-    }
-    description = wedge['text']
-
-    if kind == 'reunion':
-        if not target or target['franchise_id'] != fid:
-            raise RuleError('The selected reunion card is unavailable.')
-        constraints.update(
-            player_id=target['id'],
-            card_uuid=target.get('card_uuid'),
-            kind=target['kind'],
-            ovr=target['ovr'],
-            version=target.get('version', ''),
-            series=target.get('series', ''),
-        )
-        description += (
-            ' · ' + target['name']
-            + ' · ' + str(target['ovr']) + ' OVR'
-        )
-
-    repo.put('moves', dict(
-        id=key,
-        franchise_id=fid,
-        run_id=saved_spin['run_id'],
-        game_id=job.get('game_id'),
-        created_at=now(),
-        source=job['source'],
-        spin_id=saved_spin['id'],
-        type=kind,
-        target=target['id'] if target else None,
-        description=description,
-        constraints=constraints,
-        status='pending',
-        critical=kind in ['dfa', 'demote', 'trade', 'tag'],
-        resolution_notes='',
-    ))
-
-
-def spin(repo, fid, job_id):
-    with repo.transaction():
-        existing = repo.get('spins', job_id)
-        if existing:
-            if existing['franchise_id'] != fid:
-                raise RuleError('Spin belongs to another franchise.')
-            return existing
-
-        franchise = repo.get('franchises', fid)
-        job = current_job(repo, fid)
-        if (
-            franchise['state'] != State.WHEEL
-            or not job
-            or job['id'] != job_id
-        ):
-            raise RuleError('This spin is not the current required action.')
-
-        options = available(repo, fid, job)
-        if not options:
-            outcome = dict(
-                id='impossible',
-                text='No eligible options — branch deferred',
-                effect='deferred',
-            )
         else:
-            outcome = random.SystemRandom().choices(
-                options,
-                weights=[wedge.get('weight', 1) for wedge in options],
-                k=1,
-            )[0]
+            raise RuleError('Complete the current action first.')
 
-        target = _choose_target(repo, fid, outcome, job)
-        if outcome.get('effect') == 'reunion' and not target:
-            raise RuleError('No eligible former card is available.')
+        repo.put('runs', run)
+        repo.put('franchises', f)
 
-        record = dict(
-            id=job_id,
-            franchise_id=fid,
-            run_id=franchise['current_run'],
-            game_id=job.get('game_id'),
-            wheel_id=job['wheel_id'],
-            result=outcome,
-            available=options,
-            target=target['id'] if target else None,
-            created_at=now(),
-            reroll_reason=(
-                'Impossible child only'
-                if not options else job.get('reroll_reason')
-            ),
-            admin_note='',
-            job=dict(job),
-            parent_spin=job.get('parent_spin'),
+
+def _resolve_reunion(repo, fid, move, target_id, new_player, notes):
+    """Restore the former card selected by the audited wheel spin."""
+    pid = move.get('target')
+    if not pid or (target_id is not None and target_id != pid):
+        raise RuleError(
+            'Reunion Signing must use the former card selected by the wheel.'
         )
-        repo.put('spins', record)
-        return record
 
+    if new_player is not None:
+        raise RuleError(
+            'Reunion Signing uses an existing card. '
+            'Do not submit incoming card JSON.'
+        )
 
-def _bank_trade_result(repo, fid, saved_spin, context):
-    original = context['original_result']
-    key = 'move:' + context['original_spin_id']
-    if repo.get('moves', key):
-        return
+    spin_id = move.get('spin_id')
+    saved_spin = repo.get('spins', spin_id) if spin_id else None
+    if (
+        not saved_spin
+        or saved_spin['franchise_id'] != fid
+        or saved_spin.get('target') != pid
+        or saved_spin.get('result', {}).get('effect') != 'reunion'
+    ):
+        raise RuleError('This reunion reward has no matching audited spin.')
 
-    constraints = {
-        'instruction': original.get('description', original['text']),
-        'branch': list(context.get('branch', [])),
-        'quantity': 1,
-        'kind': context['kind'],
-        'teams': list(context['teams']),
-        'positions': list(context['positions']),
-        'market_label': context['market_label'],
-        'position_label': context['position_label'],
-    }
-    if context.get('max_ovr') is not None:
-        constraints['max_ovr'] = context['max_ovr']
+    player = repo.get('players', pid)
+    if not player or player['franchise_id'] != fid:
+        raise RuleError('The selected former card is unavailable.')
 
-    repo.put('moves', dict(
-        id=key,
-        franchise_id=fid,
-        run_id=saved_spin['run_id'],
-        game_id=context.get('game_id'),
-        created_at=now(),
-        source=context['source'],
-        spin_id=context['original_spin_id'],
-        type='trade',
-        target=context['target'],
-        description=(
-            original['text'] + ' · '
-            + context['market_label'] + ' · '
-            + context['position_label']
-        ),
-        constraints=constraints,
-        status='pending',
-        critical=True,
-        resolution_notes='',
-    ))
+    rules = move.get('constraints', {})
+    for field in ['kind', 'ovr', 'version', 'series', 'card_uuid']:
+        if field in rules and player.get(field) != rules[field]:
+            raise RuleError(
+                'The selected card details changed after the spin. '
+                'Restore the original card details or defer this reward.'
+            )
 
+    errors = card_event_errors(player, settings(repo, fid))
+    if errors:
+        raise RuleError(
+            'The reunion card must meet the current Event rules. '
+            + ' '.join(errors)
+        )
 
-def _queue_trade_step(
-    repo, fid, franchise, job, saved_spin, wheel_id, context,
-):
-    enqueue(
-        franchise,
-        wheel_id,
-        job['source'],
-        job.get('game_id'),
-        context['target'],
-        job.get('depth', 0) + 1,
+    before_card = dict(player)
+
+    if player['area'] not in ACTIVE_AREAS:
+        player.update(
+            area='minors',
+            position=player['primary'],
+            order=max(1, player.get('order', 1)),
+        )
+
+    player['historical_only'] = False
+    player['last_reunion_at'] = now()
+    player['last_reunion_move'] = move['id']
+    repo.put('players', player)
+
+    move['reunion_player_id'] = pid
+
+    audit(
+        repo,
+        fid,
+        'reunion_card_return',
+        before_card,
+        dict(player),
+        notes,
+        move.get('run_id'),
     )
-    next_job = franchise['queue'].pop()
-    next_job['trade_context'] = dict(context)
-    next_job['constraints'] = list(job.get('constraints', []))
-    next_job['parent_spin'] = saved_spin['id']
-    franchise['queue'].insert(0, next_job)
 
 
-def continue_spin(repo, fid, job_id, acknowledged=False):
+def resolve_move(
+    repo,
+    fid,
+    mid,
+    action,
+    notes,
+    target_id=None,
+    new_player=None,
+    replace_tag=None,
+    confirmed=False,
+    cancel_move_id=None,
+    max_card_confirmed=False,
+):
     with repo.transaction():
-        franchise = repo.get('franchises', fid)
-        job = current_job(repo, fid)
-        if not job or job['id'] != job_id:
+        move = repo.get('moves', mid)
+        if not move or move['franchise_id'] != fid:
+            raise RuleError('Invalid move.')
+
+        if move['status'] not in ['pending', 'deferred']:
             return
 
-        saved_spin = repo.get('spins', job_id)
-        if not saved_spin:
-            raise RuleError('Spin the wheel first.')
-
-        wedge = saved_spin['result']
-        effect = wedge.get('effect', 'acquire')
-
-        if effect == 'arrangement' and not acknowledged:
+        if locked(repo, fid):
             raise RuleError(
-                'Apply the legal arrangement in Roster Manager '
-                'and confirm it before continuing.'
+                'Banked moves can only resolve after the week ends.'
             )
 
-        target = (
-            repo.get('players', saved_spin['target'])
-            if saved_spin.get('target') else None
-        )
-        if effect == 'reunion' and (
-            not target or target['franchise_id'] != fid
-        ):
-            raise RuleError('The selected reunion card is unavailable.')
-
-        franchise['queue'].pop(0)
-        follow = wedge.get('follow_up')
-
-        if follow:
-            children = wedge.get('quantity', 1)
-            for _ in range(children):
-                enqueue(
-                    franchise, follow, job['source'],
-                    job.get('game_id'), job.get('target'),
-                    job.get('depth', 0) + 1,
-                )
-                franchise['queue'][-1]['constraints'] = (
-                    job.get('constraints', []) + [wedge['text']]
-                )
-                franchise['queue'][-1]['parent_spin'] = saved_spin['id']
-
-            new = franchise['queue'][-children:]
-            franchise['queue'] = new + franchise['queue'][:-children]
-
-        elif effect == 'trade_market':
-            context = dict(job['trade_context'])
-            context['teams'] = list(wedge['teams'])
-            context['market_label'] = wedge['text']
-            _queue_trade_step(
-                repo, fid, franchise, job, saved_spin,
-                'trade_position', context,
-            )
-            franchise['queue'][0]['constraints'].append(
-                'Incoming market: ' + wedge['text']
+        f = repo.get('franchises', fid)
+        if f['state'] not in [
+            State.MOVES, State.REBUILD, State.VALIDATION,
+        ]:
+            raise RuleError(
+                'Finish MVP and elimination before resolving moves.'
             )
 
-        elif effect == 'trade_position':
-            context = dict(job['trade_context'])
-            context['positions'] = list(wedge['positions'])
-            context['position_label'] = wedge['text']
-            _bank_trade_result(repo, fid, saved_spin, context)
+        if not isinstance(notes, str) or not notes.strip() or not confirmed:
+            raise RuleError(
+                'Provide resolution notes and confirm the action.'
+            )
 
-        elif effect == 'trade':
-            if not target:
-                raise RuleError('This trade needs an outgoing player.')
-            if wedge.get('quantity', 1) != 1:
+        before = dict(move)
+
+        if action in ['deferred', 'canceled']:
+            if move.get('critical') and move['type'] != 'tag':
                 raise RuleError(
-                    'The new trade sequence supports one outgoing player.'
+                    'Critical consequences must be applied; '
+                    'they cannot be skipped.'
+                )
+            move.update(status=action, critical=False)
+
+        elif action == 'resolved':
+            pid = target_id or move.get('target')
+
+            if (
+                move['type'] in ['dfa', 'demote', 'trade']
+                and move.get('target')
+                and pid != move['target']
+            ):
+                original = repo.get('players', move['target'])
+                if (
+                    original
+                    and original['area'] in ACTIVE_AREAS
+                    and not protected(repo, fid, original)
+                ):
+                    raise RuleError(
+                        'Use the audited wheel target; retargeting is '
+                        'allowed only if it becomes ineligible.'
+                    )
+
+            quantity = move.get('constraints', {}).get('quantity', 1)
+
+            if move['type'] in ['cancel_elimination', 'save_dfa']:
+                other = (
+                    repo.get('moves', cancel_move_id)
+                    if cancel_move_id else None
+                )
+                allowed = (
+                    ['dfa']
+                    if move['type'] == 'save_dfa'
+                    else ['dfa', 'demote', 'trade']
                 )
 
-            title = wedge['text'].strip().casefold()
-            forced = (
-                'forced trade' in title
-                or title in [
-                    'trade random starter', 'future trade candidate',
-                ]
-                or job['wheel_id'] in ['elimination', 'meltdown']
-            )
-            context = {
-                'original_spin_id': saved_spin['id'],
-                'original_result': dict(wedge),
-                'target': target['id'],
-                'kind': target['kind'],
-                'max_ovr': target['ovr'] if forced else None,
-                'game_id': job.get('game_id'),
-                'source': job['source'],
-                'branch': list(job.get('constraints', [])),
-            }
-            _queue_trade_step(
-                repo, fid, franchise, job, saved_spin,
-                'trade_market', context,
-            )
-            franchise['queue'][0]['constraints'].append(
-                'Original trade: ' + wedge['text']
-            )
+                if (
+                    not other
+                    or other['franchise_id'] != fid
+                    or other['run_id'] != move['run_id']
+                    or other['status'] != 'pending'
+                    or other['type'] not in allowed
+                ):
+                    raise RuleError(
+                        'Select an eligible pending consequence from this week.'
+                    )
 
-        elif effect == 'reunion':
-            _bank(repo, fid, job, saved_spin, wedge, target)
-
-        elif effect == 'extra_spin':
-            for _ in range(wedge.get('quantity', 1)):
-                enqueue(
-                    franchise, job['wheel_id'], job['source'],
-                    job.get('game_id'), job.get('target'),
-                    job.get('depth', 0) + 1,
+                other_before = dict(other)
+                other.update(
+                    status='canceled',
+                    critical=False,
+                    resolved_at=now(),
+                    resolution_notes=(
+                        'Canceled by reward ' + mid + ': ' + notes
+                    ),
+                )
+                repo.put('moves', other)
+                audit(
+                    repo, fid, 'awarded_cancellation',
+                    other_before, other, notes, move['run_id'],
                 )
 
-        elif effect == 'protect' and 'Next Run' in wedge['text']:
-            _bank(repo, fid, job, saved_spin, wedge, target)
+            elif move['type'] == 'reunion':
+                _resolve_reunion(
+                    repo, fid, move, target_id, new_player, notes,
+                )
 
-        elif effect in ['hot_seat', 'protect', 'unprotect']:
-            if target:
-                field = 'hot_seat' if effect == 'hot_seat' else 'protected'
-                target[field] = effect != 'unprotect'
-                repo.put('players', target)
+            elif move['type'] == 'call_up':
+                player = repo.get('players', pid) if pid else None
+                if (
+                    not player
+                    or player['franchise_id'] != fid
+                    or player['area'] != 'minors'
+                ):
+                    raise RuleError(
+                        'Choose an existing minor-league player.'
+                    )
 
-                if effect == 'hot_seat' and wedge.get('quantity', 1) > 1:
-                    extra = [
-                        player for player in _targets(repo, fid, wedge)
-                        if player['id'] != target['id']
-                    ][:wedge['quantity'] - 1]
-                    for player in extra:
-                        player['hot_seat'] = True
-                        repo.put('players', player)
+                area = (
+                    'bench' if player['kind'] == 'hitter'
+                    else 'rotation' if player['primary'] == 'SP'
+                    else 'bullpen'
+                )
+                position = (
+                    player['primary']
+                    if player['kind'] == 'hitter'
+                    else 'SP' if area == 'rotation'
+                    else 'RP'
+                )
 
-        elif effect == 'challenge' and target:
-            create(
-                repo, fid, franchise['current_run'], target['id'],
-                wedge['text'], wedge.get('metric'),
-                wedge.get('threshold', 1),
-                wedge.get('scope', 'next_game'),
-                wedge.get('reward', 'protection'),
-                job.get('game_id'),
-            )
+                arrange(
+                    repo, fid, pid, area, position, player['order'],
+                )
 
-        elif effect == 'tag' and target:
-            from services.franchise_tag_service import grant
+            elif move['type'] in ['dfa', 'demote', 'trade']:
+                pool = target_pool(repo, fid)
 
-            if grant(
-                repo, fid, target['id'], source=wedge['text'],
-            ) == 'cap_decision_required':
-                _bank(repo, fid, job, saved_spin, wedge, target)
+                if not pid or pid not in {p['id'] for p in pool}:
+                    if not pool:
+                        move.update(
+                            status='invalid',
+                            critical=False,
+                            resolution_notes=(
+                                'No eligible unprotected target: ' + notes
+                            ),
+                        )
+                        repo.put('moves', move)
+                        audit(
+                            repo, fid, 'impossible_move',
+                            before, move, notes,
+                        )
+                        return
 
-        elif effect == 'arrangement':
-            from services.franchise_service import audit
+                    raise RuleError(
+                        'Choose an eligible, unprotected active player.'
+                    )
 
-            audit(
-                repo, fid, 'manual_wheel_arrangement', None, wedge,
-                'Creator confirms legal in-game arrangement',
-                franchise['current_run'],
-            )
+                targets = [pid] + [
+                    player['id'] for player in pool
+                    if player['id'] != pid
+                ][:quantity - 1]
 
-        elif effect not in ['none', 'challenge']:
-            _bank(repo, fid, job, saved_spin, wedge, target)
-            if effect == 'deferred':
-                move = repo.get('moves', f"move:{saved_spin['id']}")
-                move.update(status='deferred', critical=False)
-                repo.put('moves', move)
+                if len(targets) < quantity:
+                    raise RuleError(
+                        'Not enough eligible players for the required quantity.'
+                    )
 
-        franchise['state'] = (
-            State.WHEEL if franchise['queue']
-            else franchise['return_state']
+                if move['type'] == 'trade':
+                    if not isinstance(new_player, dict):
+                        raise RuleError('Enter one incoming trade card.')
+
+                    outgoing = repo.get('players', pid)
+                    rules = move.get('constraints', {})
+                    required_kind = rules.get('kind', outgoing['kind'])
+
+                    if (
+                        outgoing['kind'] != required_kind
+                        or new_player.get('kind') != required_kind
+                    ):
+                        raise RuleError(
+                            'Trade hitters for hitters and pitchers for pitchers.'
+                        )
+
+                    if new_player.get('eligibility') != 'legal':
+                        raise RuleError(
+                            'The incoming card must be Event-legal.'
+                        )
+
+                    allowed_teams = rules.get('teams', [])
+                    incoming_team = str(
+                        new_player.get('team', '')
+                    ).strip()
+
+                    if (
+                        allowed_teams
+                        and incoming_team.casefold() not in {
+                            team.casefold() for team in allowed_teams
+                        }
+                    ):
+                        raise RuleError(
+                            'Incoming team must match the market spin. '
+                            'Allowed teams: ' + ', '.join(allowed_teams)
+                        )
+
+                    allowed_positions = rules.get('positions', [])
+                    if (
+                        allowed_positions
+                        and new_player.get('primary')
+                        not in allowed_positions
+                    ):
+                        raise RuleError(
+                            'Incoming primary position must match the '
+                            'position spin: ' + ', '.join(allowed_positions)
+                        )
+
+                    max_ovr = rules.get('max_ovr')
+                    if max_ovr is not None:
+                        incoming_ovr = new_player.get('ovr')
+                        if (
+                            type(incoming_ovr) is not int
+                            or not 0 <= incoming_ovr <= max_ovr
+                        ):
+                            raise RuleError(
+                                f'Incoming OVR must be {max_ovr} or lower.'
+                            )
+
+                for target in targets:
+                    remove_player(
+                        repo,
+                        fid,
+                        target,
+                        'minors' if move['type'] == 'demote' else 'dfa',
+                    )
+
+                if move['type'] == 'trade':
+                    add_player(repo, fid, new_player)
+
+            elif move['type'] == 'tag':
+                if (
+                    not pid
+                    or grant(
+                        repo,
+                        fid,
+                        pid,
+                        replace_tag,
+                        source=move['description'],
+                    ) == 'cap_decision_required'
+                ):
+                    raise RuleError(
+                        'Choose a tag holder to replace, '
+                        'or decline this new tag.'
+                    )
+
+            elif move['type'] == 'protect':
+                player = repo.get('players', pid) if pid else None
+                if not player or player['franchise_id'] != fid:
+                    raise RuleError('Select a protection target.')
+
+                player['protected'] = True
+                if 'Next Run' in move['description']:
+                    player['protection_until_run'] = (
+                        repo.get('runs', f['current_run'])['number'] + 1
+                    )
+                repo.put('players', player)
+
+            elif move['type'] == 'extra_spin':
+                enqueue(f, 'front_office', move['id'])
+                f.update(state=State.WHEEL, return_state=State.MOVES)
+                repo.put('franchises', f)
+
+            elif move['type'] == 'upgrade':
+                earned_by = (
+                    repo.get('players', move['target'])
+                    if move.get('target') else None
+                )
+                if not earned_by or earned_by['franchise_id'] != fid:
+                    raise RuleError(
+                        'The player who earned this reward is unavailable.'
+                    )
+
+                recipient_id = target_id or earned_by['id']
+                if recipient_id != earned_by['id']:
+                    if move.get('source') != 'development':
+                        raise RuleError(
+                            'This upgrade cannot transfer to a teammate.'
+                        )
+                    if max_card_confirmed is not True:
+                        raise RuleError(
+                            'Confirm that the original player has no higher '
+                            'Event-eligible card before choosing a teammate.'
+                        )
+                    move['upgrade_earned_by'] = earned_by['id']
+
+                move['upgrade_recipient'] = recipient_id
+                player = repo.get('players', recipient_id)
+                if not player or player['franchise_id'] != fid:
+                    raise RuleError('The upgrade player is unavailable.')
+
+                if player['area'] not in ACTIVE_AREAS:
+                    raise RuleError(
+                        'The player must be on the active roster. '
+                        'Defer the upgrade if they have been removed.'
+                    )
+
+                if not isinstance(new_player, dict):
+                    raise RuleError(
+                        'Enter one upgraded card as a JSON object.'
+                    )
+
+                if (
+                    new_player.get('name', '').strip().casefold()
+                    != player['name'].strip().casefold()
+                ):
+                    raise RuleError('The upgrade must be the same player.')
+
+                if new_player.get('kind') != player['kind']:
+                    raise RuleError(
+                        'The upgraded card must have the same player type.'
+                    )
+
+                ovr = new_player.get('ovr')
+                if (
+                    type(ovr) is not int
+                    or not player['ovr'] < ovr <= 99
+                ):
+                    raise RuleError(
+                        'The upgraded OVR must be higher, up to 99.'
+                    )
+
+                if not str(new_player.get('version', '')).strip():
+                    raise RuleError('Enter the upgraded card version.')
+
+                if new_player.get('eligibility') != 'legal':
+                    raise RuleError(
+                        'Confirm that the upgraded card is Event-legal.'
+                    )
+
+                primary = new_player.get('primary')
+                secondary = new_player.get('secondary', [])
+                if (
+                    primary not in POSITIONS
+                    or not isinstance(secondary, list)
+                    or any(pos not in POSITIONS for pos in secondary)
+                ):
+                    raise RuleError(
+                        'Enter valid primary and secondary positions.'
+                    )
+
+                before_card = dict(player)
+                upgraded = dict(player)
+
+                for field in [
+                    'version', 'ovr', 'primary', 'secondary',
+                    'team', 'series', 'bat', 'throw', 'eligibility',
+                ]:
+                    if field in new_player:
+                        upgraded[field] = new_player[field]
+
+                if upgraded['position'] not in legal_positions(upgraded):
+                    raise RuleError(
+                        'The upgraded card cannot play the current assigned '
+                        'position. Arrange the player legally first.'
+                    )
+
+                repo.put('players', upgraded)
+                audit(
+                    repo,
+                    fid,
+                    'development_card_upgrade',
+                    before_card,
+                    upgraded,
+                    notes,
+                    move['run_id'],
+                )
+
+            elif move['type'] == 'acquire':
+                incoming = (
+                    new_player if isinstance(new_player, list)
+                    else [new_player] if new_player else []
+                )
+                if len(incoming) != quantity:
+                    raise RuleError(
+                        f'Provide {quantity} incoming card(s).'
+                    )
+
+                for card in incoming:
+                    add_player(repo, fid, card)
+
+            # Review/choice rewards are acknowledged with resolution notes.
+            move['status'] = 'resolved'
+
+        else:
+            raise RuleError('Unknown resolution action.')
+
+        move.update(resolution_notes=notes, resolved_at=now())
+        repo.put('moves', move)
+
+        audit(
+            repo,
+            fid,
+            'resolve_move',
+            before,
+            move,
+            notes,
+            move.get('run_id'),
         )
-        repo.put('franchises', franchise)
 
 
-def retry_impossible_branch(repo, fid, job_id):
-    """Retry an impossible child only after eligible options exist."""
+def finish_validation(repo, fid):
     with repo.transaction():
-        franchise = repo.get('franchises', fid)
-        job = current_job(repo, fid)
-        original = repo.get('spins', job_id)
+        f = repo.get('franchises', fid)
+        if not f or f['state'] != State.VALIDATION:
+            raise RuleError('Proceed to roster validation first.')
 
-        if (
-            not job
-            or job['id'] != job_id
-            or not original
-            or original['result']['id'] != 'impossible'
-            or not job.get('parent_spin')
-        ):
-            raise RuleError(
-                'Only an impossible nested branch has retry permission.'
+        result = validate(repo, fid)
+        if not result.valid:
+            raise RuleError('\n'.join(result.errors))
+
+        run = repo.get('runs', f.get('current_run'))
+        if not run:
+            raise RuleError('No current week was found.')
+
+        snapshot(repo, fid, run['id'], 'rebuilt')
+        current_number = run['number']
+
+        for player in repo.list('players', fid):
+            player.update(
+                protected=bool(
+                    player.get('protection_until_run', 0)
+                    > current_number
+                ),
+                hot_seat=False,
             )
+            repo.put('players', player)
 
-        if not available(repo, fid, job):
-            raise RuleError(
-                'This branch still has no eligible options. '
-                'Defer it instead.'
-            )
-
-        replacement = dict(
-            job,
-            id=uid(),
-            reroll_reason='Retry of impossible nested branch',
-            retried_spin=job_id,
-        )
-        franchise['queue'][0] = replacement
-        repo.put('franchises', franchise)
-        return replacement['id']
+        f['state'] = State.READY
+        repo.put('franchises', f)
