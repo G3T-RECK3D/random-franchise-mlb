@@ -245,3 +245,54 @@ def import_completed_week(repo, fid, season_id, payload):
             rid,
         )
         return rid
+def move_historical_week(repo, fid, run_id, destination_season_id):
+    """Move an imported week to the correct season without duplicating stats."""
+    with repo.transaction():
+        franchise = repo.get('franchises', fid)
+        run = repo.get('runs', run_id)
+        season = repo.get('seasons', destination_season_id)
+
+        if (
+            not franchise
+            or not run
+            or run['franchise_id'] != fid
+            or not season
+            or season['franchise_id'] != fid
+        ):
+            raise RuleError('Choose a valid historical week and season.')
+
+        if (
+            not run.get('recovered')
+            or run.get('offseason_step') != 'historical_complete'
+            or franchise.get('current_run') == run_id
+        ):
+            raise RuleError('Only imported historical weeks can be moved here.')
+
+        if run.get('season_id') == destination_season_id:
+            raise RuleError('This week already belongs to that season.')
+
+        if any(
+            other['id'] != run_id
+            and other.get('season_id') == destination_season_id
+            and other.get('week_number') == run['week_number']
+            for other in repo.list('runs', fid)
+        ):
+            raise RuleError(
+                'The destination season already contains this week number.'
+            )
+
+        before = dict(run)
+        run.update(
+            season_id=destination_season_id,
+            event=season['event'],
+        )
+        repo.put('runs', run)
+
+        audit(
+            repo, fid, 'move_historical_week',
+            before, run,
+            'Correct the season selected during historical import.',
+            run_id,
+        )
+
+        return run_id
