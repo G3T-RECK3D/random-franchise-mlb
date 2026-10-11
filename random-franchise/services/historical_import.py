@@ -18,12 +18,8 @@ def import_completed_week(repo, fid, season_id, payload):
         if not franchise or not season or season['franchise_id'] != fid:
             raise RuleError('Select a valid franchise and season.')
 
-            if not isinstance(lines, list):
-                raise RuleError('Game stat lines must be a list.')
-            if not lines and item.get('stats_unavailable') is not True:
-                raise RuleError(
-                    'Include stat lines or mark the box score as unavailable.'
-                )
+        if not isinstance(payload, dict):
+            raise RuleError('Historical import must be a JSON object.')
 
         week_number = payload.get('week_number')
         if type(week_number) is not int or week_number < 1:
@@ -50,6 +46,7 @@ def import_completed_week(repo, fid, season_id, payload):
                 and existing[0].get('import_fingerprint') == fingerprint
             ):
                 return existing[0]['id']
+
             raise RuleError(
                 'This season already contains that week. '
                 'A different import cannot overwrite it.'
@@ -62,8 +59,10 @@ def import_completed_week(repo, fid, season_id, payload):
 
         cards = payload.get('players')
         games = payload.get('games')
+
         if not isinstance(cards, list) or not cards:
             raise RuleError('Include the historical player cards.')
+
         if not isinstance(games, list) or not games:
             raise RuleError('Include the historical games.')
 
@@ -76,6 +75,7 @@ def import_completed_week(repo, fid, season_id, payload):
 
             card_key = card.get('key')
             card_uuid = card.get('card_uuid')
+
             if (
                 not isinstance(card_key, str)
                 or not card_key
@@ -91,6 +91,7 @@ def import_completed_week(repo, fid, season_id, payload):
                 player for player in current_players
                 if player.get('card_uuid') == card_uuid
             ]
+
             if len(matches) > 1:
                 raise RuleError(
                     'Multiple existing entries match this card: '
@@ -99,6 +100,7 @@ def import_completed_week(repo, fid, season_id, payload):
 
             if matches:
                 player = matches[0]
+
                 if (
                     player['name'] != card.get('name')
                     or player['kind'] != card.get('kind')
@@ -110,6 +112,7 @@ def import_completed_week(repo, fid, season_id, payload):
                     for key, value in card.items()
                     if key != 'key'
                 }
+
                 data.update(
                     area='minors',
                     position=data.get('primary', 'C'),
@@ -117,8 +120,12 @@ def import_completed_week(repo, fid, season_id, payload):
                     protected=False,
                     hot_seat=False,
                     historical_only=True,
-                    notes='Recovered historical card; not added to active roster.',
+                    notes=(
+                        'Recovered historical card; '
+                        'not added to active roster.'
+                    ),
                 )
+
                 pid = add_player(repo, fid, data)
                 player = repo.get('players', pid)
                 current_players.append(player)
@@ -134,58 +141,88 @@ def import_completed_week(repo, fid, season_id, payload):
         for number, item in enumerate(games, 1):
             if not isinstance(item, dict):
                 raise RuleError('Each game must be a JSON object.')
+
             if losses >= 2:
-                raise RuleError('A completed week cannot continue after two losses.')
+                raise RuleError(
+                    'A completed week cannot continue after two losses.'
+                )
 
             result = item.get('result')
             if result not in ['W', 'L']:
                 raise RuleError('Every game needs a W or L result.')
 
             played = item.get('date')
+
             try:
                 date.fromisoformat(played)
             except (TypeError, ValueError):
-                raise RuleError('Every game needs a date in YYYY-MM-DD format.')
+                raise RuleError(
+                    'Every game needs a date in YYYY-MM-DD format.'
+                )
+
             if dates and played < dates[-1]:
-                raise RuleError('List historical games in chronological order.')
+                raise RuleError(
+                    'List historical games in chronological order.'
+                )
+
             dates.append(played)
 
             own = item.get('team_score')
-            opponent = item.get('opponent_score')
-            if type(own) is not int or type(opponent) is not int:
+            opponent_score = item.get('opponent_score')
+
+            if type(own) is not int or type(opponent_score) is not int:
                 raise RuleError('Enter integer scores for both teams.')
+
             if (
-                min(own, opponent) < 0
-                or own == opponent
-                or (own > opponent) != (result == 'W')
+                min(own, opponent_score) < 0
+                or own == opponent_score
+                or (own > opponent_score) != (result == 'W')
             ):
-                raise RuleError('Historical scores must agree with the result.')
+                raise RuleError(
+                    'Historical scores must agree with the result.'
+                )
 
             gid = uid()
             lines = item.get('lines')
-            if not isinstance(lines, list) or not lines:
-                raise RuleError('Each game needs player stat lines.')
+
+            if not isinstance(lines, list):
+                raise RuleError('Game stat lines must be a list.')
+
+            if not lines and item.get('stats_unavailable') is not True:
+                raise RuleError(
+                    'Include stat lines or mark the box score as unavailable.'
+                )
 
             seen = set()
+
             for row in lines:
                 if not isinstance(row, dict):
                     raise RuleError('Each stat entry must be a JSON object.')
 
                 player = card_map.get(row.get('player_key'))
+
                 if not player or player['id'] in seen:
-                    raise RuleError('Use distinct players from the imported cards.')
+                    raise RuleError(
+                        'Use distinct players from the imported cards.'
+                    )
+
                 seen.add(player['id'])
                 used_ids.add(player['id'])
 
                 supplied = row.get('line')
+
                 if not isinstance(supplied, dict):
                     raise RuleError('Each player needs a stat-line object.')
 
                 keys = HITTER if player['kind'] == 'hitter' else PITCHER
+
                 if set(supplied) - set(keys):
                     raise RuleError('Stat line contains an unknown field.')
+
                 if supplied.get('games') != 1:
-                    raise RuleError('Each participant must have games set to 1.')
+                    raise RuleError(
+                        'Each participant must have games set to 1.'
+                    )
 
                 missing = [key for key in keys if key not in supplied]
                 normalized = validate_line(player['kind'], supplied)
@@ -210,22 +247,30 @@ def import_completed_week(repo, fid, season_id, payload):
                 result=result,
                 opponent=item.get('opponent', ''),
                 team_score=own,
-                opponent_score=opponent,
+                opponent_score=opponent_score,
                 date=played,
                 notes=item.get('notes', ''),
                 created_at=now(),
                 recovered=True,
+                stats_unavailable=item.get('stats_unavailable') is True,
+                date_inferred=item.get('date_inferred') is True,
             ))
+
             wins += result == 'W'
             losses += result == 'L'
 
         if losses != 2:
-            raise RuleError('A completed historical week must contain two losses.')
+            raise RuleError(
+                'A completed historical week must contain two losses.'
+            )
 
         run = dict(
             id=rid,
             franchise_id=fid,
-            number=max((run['number'] for run in runs), default=0) + 1,
+            number=max(
+                (run['number'] for run in runs),
+                default=0,
+            ) + 1,
             season_id=season_id,
             week_number=week_number,
             event=season['event'],
@@ -241,61 +286,81 @@ def import_completed_week(repo, fid, season_id, payload):
             recovered=True,
             import_fingerprint=fingerprint,
         )
+
         repo.put('runs', run)
+
         audit(
-            repo, fid, 'import_historical_week',
-            None, run,
+            repo,
+            fid,
+            'import_historical_week',
+            None,
+            run,
             'Restore historical games without replaying wheels or rewards.',
             rid,
         )
+
         return rid
+
+
 def move_historical_week(repo, fid, run_id, destination_season_id):
-    """Move an imported week to the correct season without duplicating stats."""
+    """Move an imported historical week without changing games or stats."""
     with repo.transaction():
         franchise = repo.get('franchises', fid)
         run = repo.get('runs', run_id)
-        season = repo.get('seasons', destination_season_id)
+        destination = repo.get('seasons', destination_season_id)
 
         if (
             not franchise
             or not run
             or run['franchise_id'] != fid
-            or not season
-            or season['franchise_id'] != fid
+            or not destination
+            or destination['franchise_id'] != fid
         ):
-            raise RuleError('Choose a valid historical week and season.')
+            raise RuleError(
+                'Select a valid historical week and destination season.'
+            )
 
         if (
             not run.get('recovered')
             or run.get('offseason_step') != 'historical_complete'
+            or not run.get('ended_at')
             or franchise.get('current_run') == run_id
         ):
-            raise RuleError('Only imported historical weeks can be moved here.')
+            raise RuleError(
+                'Only completed historical imports can be moved.'
+            )
 
         if run.get('season_id') == destination_season_id:
             raise RuleError('This week already belongs to that season.')
 
+        week_number = run.get('week_number', run['number'])
+
         if any(
             other['id'] != run_id
             and other.get('season_id') == destination_season_id
-            and other.get('week_number') == run['week_number']
+            and other.get('week_number', other['number']) == week_number
             for other in repo.list('runs', fid)
         ):
             raise RuleError(
-                'The destination season already contains this week number.'
+                'The destination season already contains that week number.'
             )
 
         before = dict(run)
+
         run.update(
             season_id=destination_season_id,
-            event=season['event'],
+            event=destination['event'],
         )
+
         repo.put('runs', run)
 
         audit(
-            repo, fid, 'move_historical_week',
-            before, run,
-            'Correct the season selected during historical import.',
+            repo,
+            fid,
+            'move_historical_week',
+            before,
+            run,
+            'Correct the season assigned to an imported historical week.',
             run_id,
         )
 
