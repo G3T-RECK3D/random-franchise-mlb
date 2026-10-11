@@ -1,5 +1,8 @@
+import json
 import streamlit as st
 
+from models.domain import RuleError, now
+from services.franchise_service import audit
 from services.stat_engine import aggregate_season
 from ui.common import run_page, table
 
@@ -55,8 +58,8 @@ def render(repo, f):
     b.metric('Games recorded', len(games))
     c.metric(
         'Season record',
-        f"{sum(g['result'] == 'W' for g in games)}–"
-        f"{sum(g['result'] == 'L' for g in games)}",
+        f"{sum(game['result'] == 'W' for game in games)}–"
+        f"{sum(game['result'] == 'L' for game in games)}",
     )
 
     mvp = (
@@ -71,11 +74,14 @@ def render(repo, f):
 
     hitters = []
     pitchers = []
+    eligible_players = {}
 
     for player in repo.list('players', fid):
         totals = aggregate_season(repo, fid, player, selected)
         if not totals.get('games', 0):
             continue
+
+        eligible_players[player['id']] = player
 
         if player['kind'] == 'hitter':
             score = (
@@ -147,9 +153,120 @@ def render(repo, f):
         with st.expander('All season pitching stats'):
             table(pitchers)
 
+    st.subheader('Select Season MVP')
+
+    if season['status'] == 'active':
+        st.info(
+            'Select the final Season MVP after this season is completed.'
+        )
+    elif not eligible_players:
+        st.info('Restore player stats before selecting a Season MVP.')
+    else:
+        candidate_ids = sorted(
+            eligible_players,
+            key=lambda pid: (
+                eligible_players[pid]['name'],
+                eligible_players[pid].get('ovr', 0),
+                pid,
+            ),
+        )
+        options = [None] + candidate_ids
+        saved_mvp = season.get('mvp')
+
+        def candidate_label(pid):
+            if pid is None:
+                return 'Choose a Season MVP'
+            player = eligible_players[pid]
+            return (
+                player['name']
+                + ' · '
+                + str(player.get('ovr', ''))
+                + ' OVR · '
+                + player.get('series', '')
+                + ' · '
+                + player.get('version', '')
+            )
+
+        with st.form('season_mvp:' + fid + ':' + selected):
+            chosen_mvp = st.selectbox(
+                'Season MVP',
+                options,
+                index=(
+                    options.index(saved_mvp)
+                    if saved_mvp in options
+                    else 0
+                ),
+                format_func=candidate_label,
+            )
+            reason = st.text_input(
+                'Selection notes / reason',
+                placeholder='Example: Led the season in HR, RBI, and OPS.',
+            )
+            confirmed_mvp = st.checkbox(
+                'I confirm this MVP selection for the displayed season.'
+            )
+            st.caption(
+                'Records the season award. It does not grant protection, '
+                'a franchise tag, or an extra wheel spin.'
+            )
+
+            if st.form_submit_button(
+                'Save Season MVP',
+                type='primary',
+            ):
+                try:
+                    if chosen_mvp is None:
+                        raise RuleError('Choose a Season MVP.')
+                    if not confirmed_mvp:
+                        raise RuleError('Confirm the season and MVP choice.')
+                    if not reason.strip():
+                        raise RuleError('Enter a selection reason.')
+
+                    with repo.transaction():
+                        current_season = repo.get('seasons', selected)
+                        if (
+                            not current_season
+                            or current_season['franchise_id'] != fid
+                            or current_season['status'] == 'active'
+                        ):
+                            raise RuleError(
+                                'Select a completed season in this franchise.'
+                            )
+
+                        player = repo.get('players', chosen_mvp)
+                        if (
+                            not player
+                            or player['franchise_id'] != fid
+                            or not aggregate_season(
+                                repo, fid, player, selected
+                            ).get('games', 0)
+                        ):
+                            raise RuleError(
+                                'Choose a player with saved stats '
+                                'in this season.'
+                            )
+
+                        before = dict(current_season)
+                        current_season.update(
+                            mvp=chosen_mvp,
+                            mvp_selected_at=now(),
+                            mvp_notes=reason.strip(),
+                        )
+                        repo.put('seasons', current_season)
+                        audit(
+                            repo,
+                            fid,
+                            'select_season_mvp',
+                            before,
+                            current_season,
+                            reason.strip(),
+                        )
+                except RuleError as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
+
     with st.expander('Restore a completed historical week'):
-        import json
-        from models.domain import RuleError
         from services.historical_import import import_completed_week
 
         st.write(
@@ -187,8 +304,8 @@ def render(repo, f):
                 st.error(str(exc))
             else:
                 st.rerun()
+
     with st.expander('Correct the season of an imported week'):
-        from models.domain import RuleError
         from services.historical_import import move_historical_week
 
         imported = [
@@ -197,7 +314,6 @@ def render(repo, f):
             and week.get('offseason_step') == 'historical_complete'
             and week['id'] != f.get('current_run')
         ]
-
         destinations = [
             sid for sid in season_ids if sid != selected
         ]
@@ -221,7 +337,6 @@ def render(repo, f):
                 ),
                 key='move_week:' + fid + ':' + selected,
             )
-
             destination = st.selectbox(
                 'Move to season',
                 destinations,
@@ -231,7 +346,6 @@ def render(repo, f):
                 ),
                 key='move_destination:' + fid + ':' + selected,
             )
-
             confirmed_move = st.checkbox(
                 'I confirm moving this week and its stats to this season.',
                 key='move_confirm:' + fid + ':' + selected,
@@ -250,8 +364,10 @@ def render(repo, f):
                     st.error(str(exc))
                 else:
                     st.rerun()
+
     st.subheader('Weekly results')
     rows = []
+
     for week in weeks:
         weekly_mvp = (
             repo.get('players', week['mvp'])
@@ -262,11 +378,14 @@ def render(repo, f):
             'Week': week.get('week_number', week['number']),
             'Wins': week['wins'],
             'Losses': week['losses'],
-            'Status': 'Completed' if week['ended_at'] else 'In progress',
+            'Status': (
+                'Completed' if week['ended_at'] else 'In progress'
+            ),
             'Weekly MVP': (
                 weekly_mvp['name'] if weekly_mvp else 'Not selected'
             ),
         })
+
     table(rows)
 
 
