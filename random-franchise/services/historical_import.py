@@ -18,8 +18,12 @@ def import_completed_week(repo, fid, season_id, payload):
         if not franchise or not season or season['franchise_id'] != fid:
             raise RuleError('Select a valid franchise and season.')
 
-        if not isinstance(payload, dict):
-            raise RuleError('Historical import must be a JSON object.')
+            if not isinstance(lines, list):
+                raise RuleError('Game stat lines must be a list.')
+            if not lines and item.get('stats_unavailable') is not True:
+                raise RuleError(
+                    'Include stat lines or mark the box score as unavailable.'
+                )
 
         week_number = payload.get('week_number')
         if type(week_number) is not int or week_number < 1:
