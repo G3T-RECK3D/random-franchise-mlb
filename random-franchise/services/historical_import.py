@@ -1,4 +1,4 @@
-"""Restore completed historical weeks without replaying game rewards."""
+"""Restore historical weeks without replaying game rewards."""
 
 import hashlib
 import json
@@ -15,7 +15,11 @@ def import_completed_week(repo, fid, season_id, payload):
         franchise = repo.get('franchises', fid)
         season = repo.get('seasons', season_id)
 
-        if not franchise or not season or season['franchise_id'] != fid:
+        if (
+            not franchise
+            or not season
+            or season['franchise_id'] != fid
+        ):
             raise RuleError('Select a valid franchise and season.')
 
         if not isinstance(payload, dict):
@@ -24,6 +28,12 @@ def import_completed_week(repo, fid, season_id, payload):
         week_number = payload.get('week_number')
         if type(week_number) is not int or week_number < 1:
             raise RuleError('Week number must be a positive integer.')
+
+        ended_reason = payload.get('ended_reason', 'loss_limit')
+        if ended_reason not in ['loss_limit', 'event_ended']:
+            raise RuleError(
+                'Week ending reason must be loss_limit or event_ended.'
+            )
 
         fingerprint = hashlib.sha256(
             json.dumps(
@@ -87,24 +97,24 @@ def import_completed_week(repo, fid, season_id, payload):
                     'Cards need distinct keys and a verified card UUID.'
                 )
 
+            # Match both card identity and stat role.
+            # This permits separate hitting/pitching entries for Ohtani.
             matches = [
                 player for player in current_players
                 if player.get('card_uuid') == card_uuid
+                and player.get('kind') == card.get('kind')
             ]
 
             if len(matches) > 1:
                 raise RuleError(
-                    'Multiple existing entries match this card: '
+                    'Multiple existing entries match this card and role: '
                     + card.get('name', card_key)
                 )
 
             if matches:
                 player = matches[0]
 
-                if (
-                    player['name'] != card.get('name')
-                    or player['kind'] != card.get('kind')
-                ):
+                if player['name'] != card.get('name'):
                     raise RuleError('Existing card identity does not match.')
             else:
                 data = {
@@ -144,7 +154,7 @@ def import_completed_week(repo, fid, season_id, payload):
 
             if losses >= 2:
                 raise RuleError(
-                    'A completed week cannot continue after two losses.'
+                    'A historical week cannot continue after two losses.'
                 )
 
             result = item.get('result')
@@ -173,10 +183,23 @@ def import_completed_week(repo, fid, season_id, payload):
             if type(own) is not int or type(opponent_score) is not int:
                 raise RuleError('Enter integer scores for both teams.')
 
+            # Permit a reported 0–0 result only when its box score
+            # is explicitly unavailable.
+            score_unavailable = (
+                item.get('stats_unavailable') is True
+                and own == 0
+                and opponent_score == 0
+            )
+
             if (
                 min(own, opponent_score) < 0
-                or own == opponent_score
-                or (own > opponent_score) != (result == 'W')
+                or (
+                    not score_unavailable
+                    and (
+                        own == opponent_score
+                        or (own > opponent_score) != (result == 'W')
+                    )
+                )
             ):
                 raise RuleError(
                     'Historical scores must agree with the result.'
@@ -191,6 +214,12 @@ def import_completed_week(repo, fid, season_id, payload):
             if not lines and item.get('stats_unavailable') is not True:
                 raise RuleError(
                     'Include stat lines or mark the box score as unavailable.'
+                )
+
+            if lines and score_unavailable:
+                raise RuleError(
+                    'A reported 0–0 game with an unavailable box score '
+                    'must not include player stat lines.'
                 )
 
             seen = set()
@@ -253,15 +282,17 @@ def import_completed_week(repo, fid, season_id, payload):
                 created_at=now(),
                 recovered=True,
                 stats_unavailable=item.get('stats_unavailable') is True,
+                score_unavailable=score_unavailable,
                 date_inferred=item.get('date_inferred') is True,
             ))
 
             wins += result == 'W'
             losses += result == 'L'
 
-        if losses != 2:
+        if losses != 2 and ended_reason != 'event_ended':
             raise RuleError(
-                'A completed historical week must contain two losses.'
+                'A historical week must contain two losses '
+                'or be marked as ended when the Event closed.'
             )
 
         run = dict(
@@ -281,6 +312,7 @@ def import_completed_week(repo, fid, season_id, payload):
             roster_ids=sorted(used_ids),
             started_at=dates[0],
             ended_at=dates[-1],
+            ended_reason=ended_reason,
             mvp=None,
             offseason_step='historical_complete',
             recovered=True,
