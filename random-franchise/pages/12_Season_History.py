@@ -181,8 +181,8 @@ def render(repo, f):
                     upload.getvalue().decode('utf-8-sig')
                 )
                 import_completed_week(repo, fid, selected, payload)
-            except (ValueError, UnicodeError):
-                st.error('The uploaded file is not valid JSON.')
+            except (ValueError, UnicodeError) as exc:
+                st.exception(exc)
             except RuleError as exc:
                 st.error(str(exc))
             else:
