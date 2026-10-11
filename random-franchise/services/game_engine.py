@@ -1,237 +1,424 @@
-from models.domain import State, RuleError, uid, now, ACTIVE_AREAS
-from services.franchise_service import settings, audit
-from services.roster_validator import validate
-from services.stat_engine import validate_line
-from services.challenge_service import evaluate, unlock_development
+from models.domain import RuleError, uid, now
+from services.stat_engine import aggregate
 from services.franchise_tag_service import grant
 
 
-def enqueue(franchise, wheel_id, source, game_id=None, target=None, depth=0):
-    franchise['queue'].append(dict(id=uid(), wheel_id=wheel_id, source=source, game_id=game_id,
-                                   target=target, depth=depth))
+OPEN_STATUSES = [
+    'waiting_next_run',
+    'active',
+    'awaiting_manual',
+]
 
 
-def start_run(repo, fid):
-    with repo.transaction():
-        f = repo.get('franchises', fid)
-        if f['state'] not in [State.SETUP, State.READY, State.VALIDATION]:
-            raise RuleError(
-                'Finish the current workflow before starting a week.'
-            )
+def create(
+    repo,
+    fid,
+    run_id,
+    pid,
+    description,
+    metric=None,
+    threshold=1,
+    scope='next_game',
+    reward='protection',
+    game_id=None,
+):
+    player = repo.get('players', pid)
+    if not player or player['franchise_id'] != fid:
+        raise RuleError('Challenge target not in this franchise.')
 
-        season = (
-            repo.get('seasons', f['current_season'])
-            if f.get('current_season') else None
+    identifier = uid()
+    repo.put('challenges', dict(
+        id=identifier,
+        franchise_id=fid,
+        run_id=run_id,
+        player_id=pid,
+        description=description,
+        metric=metric,
+        threshold=threshold,
+        scope=scope,
+        reward=reward,
+        source_game=game_id,
+        created_at=now(),
+        status=(
+            'waiting_next_run'
+            if scope == 'next_run'
+            else 'active'
+        ),
+    ))
+    return identifier
+
+
+def development_progress(repo, challenge):
+    """Count only the first three future saved team games."""
+    excluded = set(challenge.get('excluded_game_ids', []))
+    games = [
+        game
+        for game in repo.list(
+            'games', challenge['franchise_id']
         )
+        if game['id'] not in excluded
+        and not game.get('recovered')
+    ][:challenge.get('game_limit', 3)]
+
+    game_ids = {game['id'] for game in games}
+    totals = {}
+
+    for stat in repo.list(
+        'stats', challenge['franchise_id']
+    ):
         if (
-            not season
-            or season['franchise_id'] != fid
-            or season['status'] != 'active'
+            stat['player_id'] == challenge['player_id']
+            and stat['game_id'] in game_ids
         ):
-            raise RuleError(
-                'Set up an active season before starting a week.'
+            for field, value in stat['line'].items():
+                totals[field] = totals.get(field, 0) + value
+
+    goals = challenge.get('goals', {})
+    passed = any(
+        totals.get(field, 0) >= target
+        for field, target in goals.items()
+    )
+
+    return {
+        'games_used': len(games),
+        'game_limit': challenge.get('game_limit', 3),
+        'totals': totals,
+        'passed': passed,
+        'closed': len(games) >= challenge.get('game_limit', 3),
+    }
+
+
+def evaluate(repo, fid, run_id, game_id):
+    game = repo.get('games', game_id)
+    if not game or game['franchise_id'] != fid:
+        raise RuleError('Select a valid game.')
+
+    # Three-game challenges can continue into another week.
+    for challenge in repo.list('challenges', fid):
+        if challenge['status'] not in [
+            'active', 'passed', 'failed', 'awaiting_manual'
+        ]:
+            continue
+
+        if challenge['scope'] == 'three_games':
+            progress = development_progress(repo, challenge)
+
+            if progress['passed']:
+                challenge['status'] = 'passed'
+            elif progress['closed']:
+                challenge['status'] = 'failed'
+            else:
+                challenge['status'] = 'active'
+
+            repo.put('challenges', challenge)
+            settle(repo, challenge, progress['passed'])
+            continue
+
+        # Preserve the behavior of older wheel challenges.
+        if challenge.get('run_id') != run_id:
+            continue
+
+        source = (
+            repo.get('games', challenge['source_game'])
+            if challenge.get('source_game')
+            else None
+        )
+        games = repo.list('games', fid, run_id)
+        candidates = [
+            candidate for candidate in games
+            if not source
+            or candidate['number'] > source['number']
+        ]
+
+        if not candidates:
+            continue
+
+        if challenge['scope'] == 'next_game':
+            relevant = candidates[0]
+            if relevant['id'] != game_id:
+                continue
+            closed = True
+        else:
+            relevant = game
+            closed = bool(
+                repo.get('runs', run_id)['ended_at']
             )
 
-        errors = validate(repo, fid).errors
-        if errors:
-            raise RuleError('\n'.join(errors))
+        if challenge.get('metric'):
+            player = repo.get(
+                'players', challenge['player_id']
+            )
+            if not player:
+                continue
 
-        cfg = settings(repo, fid)
-        rid = uid()
-        runs = repo.list('runs', fid)
-        season_runs = [
-            r for r in runs
-            if r.get('season_id') == season['id']
-        ]
+            totals = aggregate(
+                repo,
+                fid,
+                player,
+                run_id,
+                relevant['id']
+                if challenge['scope'] == 'next_game'
+                else None,
+            )
+            passed = (
+                totals.get(challenge['metric'], 0)
+                >= challenge['threshold']
+            )
 
-        # Keep a franchise-wide number for existing game rules.
-        number = max(
-            (r['number'] for r in runs),
-            default=0,
-        ) + 1
+            if passed or closed:
+                challenge['status'] = (
+                    'passed' if passed else 'failed'
+                )
+                repo.put('challenges', challenge)
+                settle(repo, challenge, passed)
+        elif closed:
+            challenge['status'] = 'awaiting_manual'
+            repo.put('challenges', challenge)
 
-        # Week numbering starts over with each season.
-        week_number = max(
-            (r.get('week_number', 0) for r in season_runs),
-            default=0,
-        ) + 1
 
-        active = [
-            p['id'] for p in repo.list('players', fid)
-            if p['area'] in ACTIVE_AREAS
-        ]
+def settle(repo, challenge, passed):
+    key = f"challenge:{challenge['id']}"
+    previous = repo.get('rewards', key)
 
-        repo.put('runs', dict(
-            id=rid,
-            franchise_id=fid,
-            number=number,
-            season_id=season['id'],
-            week_number=week_number,
-            event=season['event'],
-            wins=0,
-            losses=0,
-            max_losses=cfg['max_losses'],
-            settings=cfg,
-            roster_ids=active,
-            started_at=now(),
-            ended_at=None,
-            mvp=None,
-            offseason_step=None,
+    if passed and not previous:
+        if challenge['reward'] == 'upgrade':
+            player = repo.get(
+                'players', challenge['player_id']
+            )
+            repo.put('moves', dict(
+                id=key,
+                franchise_id=challenge['franchise_id'],
+                run_id=challenge['run_id'],
+                game_id=None,
+                type='upgrade',
+                target=challenge['player_id'],
+                description=(
+                    'Development upgrade: '
+                    + player['name']
+                    + ' — next available higher-rated '
+                    'Event-legal card'
+                ),
+                constraints={},
+                status='pending',
+                critical=False,
+                created_at=now(),
+                source='development',
+            ))
+
+        elif challenge['reward'] == 'tag':
+            result = grant(
+                repo,
+                challenge['franchise_id'],
+                challenge['player_id'],
+                source=challenge['description'],
+            )
+            if result == 'cap_decision_required':
+                repo.put('moves', dict(
+                    id=key,
+                    franchise_id=challenge['franchise_id'],
+                    run_id=challenge['run_id'],
+                    game_id=None,
+                    type='tag',
+                    target=challenge['player_id'],
+                    description=(
+                        'Tag cap decision: '
+                        + challenge['description']
+                    ),
+                    constraints={},
+                    status='pending',
+                    critical=True,
+                    created_at=now(),
+                    source='challenge',
+                ))
+
+        else:
+            player = repo.get(
+                'players', challenge['player_id']
+            )
+            player['protected'] = True
+            repo.put('players', player)
+
+        repo.put('rewards', dict(
+            id=key,
+            franchise_id=challenge['franchise_id'],
+            run_id=challenge['run_id'],
+            type=challenge['reward'],
+            player_id=challenge['player_id'],
+            status='earned',
         ))
 
-        f.update(
-            current_run=rid,
-            event=season['event'],
-            state=State.ACTIVE,
-            queue=[],
-            return_state=State.ACTIVE,
+    elif not passed and previous:
+        # Flag corrected results; never repeat or silently undo rewards.
+        if previous['status'] != 'correction_review':
+            previous['status'] = 'correction_review'
+            repo.put('rewards', previous)
+
+
+def confirm_manual(repo, fid, cid, passed, evidence):
+    from services.franchise_service import audit
+
+    with repo.transaction():
+        challenge = repo.get('challenges', cid)
+        if (
+            not challenge
+            or challenge['franchise_id'] != fid
+            or challenge['status'] != 'awaiting_manual'
+            or not evidence.strip()
+        ):
+            raise RuleError(
+                'Select a pending manual challenge '
+                'and provide evidence.'
+            )
+
+        before = dict(challenge)
+        challenge.update(
+            status='passed' if passed else 'failed',
+            evidence=evidence,
         )
-        repo.put('franchises', f)
-
-        for c in repo.list('challenges', fid):
-            if c['status'] == 'waiting_next_run':
-                c.update(
-                    run_id=rid,
-                    status='active',
-                    source_game=None,
-                )
-                repo.put('challenges', c)
-
-        snapshot(repo, fid, rid, 'start')
-        return rid
+        repo.put('challenges', challenge)
+        settle(repo, challenge, passed)
+        audit(
+            repo,
+            fid,
+            'challenge_evidence',
+            before,
+            challenge,
+            evidence,
+            challenge['run_id'],
+        )
 
 
-def snapshot(repo, fid, rid, phase):
-    identifier = f'{rid}:{phase}'
-    if not repo.get('snapshots', identifier):
-        repo.put('snapshots', dict(id=identifier, franchise_id=fid, run_id=rid, phase=phase,
-            created_at=now(), players=repo.list('players', fid)))
-
-
-def milestone_sync(repo, f, run, game_id):
-    for threshold, wheel in run['settings']['milestones'].items():
-        key = f"milestone:{run['id']}:{threshold}"
-        reward = repo.get('rewards', key)
-        if run['wins'] >= int(threshold) and (not reward or reward['status'] == 'revoked'):
-            repo.put('rewards', dict(id=key, franchise_id=f['id'], run_id=run['id'], game_id=game_id,
-                                     type=wheel, threshold=int(threshold), status='earned'))
-            enqueue(f, wheel, key, game_id)
-        elif run['wins'] >= int(threshold) and reward and reward.get('game_id') == game_id:
-            if not any(j['source'] == key for j in f['queue']) and not any(s['job']['source'] == key for s in repo.list('spins', f['id'])):
-                enqueue(f, wheel, key, game_id)
-        elif run['wins'] < int(threshold) and reward and reward['status'] == 'earned':
-            reward['status'] = 'revoked'
-            repo.put('rewards', reward)
-            f['queue'] = [j for j in f['queue'] if j['source'] != key]
-
-
-def _route(repo, f, run, game):
-    if run['losses'] >= run['max_losses']:
-        run['ended_at'] = run['ended_at'] or now()
-        f['state'] = State.ENDED
-        f['return_state'] = State.ENDED
-        snapshot(repo, f['id'], run['id'], 'end')
-    else:
-        run['ended_at'] = None
-        if game['result'] == 'L':
-            enqueue(f, 'hot_seat', 'loss', game['id'])
-        f['return_state'] = State.ACTIVE
-        f['state'] = State.WHEEL if f['queue'] else State.ACTIVE
-    repo.put('runs', run)
-    repo.put('franchises', f)
-
-
-def _save_lines(repo, fid, run, game, lines):
-    seen = set()
-    for item in lines:
-        pid = item['player_id']
-        p = repo.get('players', pid)
-        if pid in seen or not p or p['franchise_id'] != fid or pid not in run['roster_ids']:
-            raise RuleError('Stat lines must reference distinct players in the run roster.')
-        seen.add(pid)
-        line = validate_line(p['kind'], item['line'])
-        flags = item.get('flags', {})
-        if flags.get('no_hitter') or flags.get('perfect_game'):
-            if p['kind'] != 'pitcher' or line['outs'] < 9 or line['ha'] != 0:
-                raise RuleError('No-hitter/perfect game needs a pitcher with at least 9 outs and zero hits allowed.')
-            if flags.get('perfect_game') and (line['bb'] or line['r']):
-                raise RuleError('Perfect game requires zero walks and runs.')
-        repo.put('stats', dict(id=f"{game['id']}:{pid}", franchise_id=fid, run_id=run['id'],
-                              player_id=pid, game_id=game['id'], line=line, flags=flags))
-        if flags.get('no_hitter') or flags.get('perfect_game'):
-            status = grant(repo, fid, pid, source='Manually confirmed no-hitter/perfect game')
-            key = f"auto_tag:{game['id']}:{pid}"
-            if status == 'cap_decision_required' and not repo.get('moves', key):
-                repo.put('moves', dict(id=key, franchise_id=fid, run_id=run['id'], game_id=game['id'],
-                    target=pid, source='no_hitter', type='tag', constraints={}, description='Automatic pitcher tag: resolve cap decision',
-                    status='pending', critical=True, created_at=now()))
-
-
-def record_game(repo, fid, request_id, result, lines=None, opponent='', team_score=None, opponent_score=None, date=None, notes=''):
+def assign_development(
+    repo,
+    fid,
+    run_id,
+    player_id,
+    game_id=None,
+    reason='Breakout performance',
+):
+    """Assign once; exclude every game already saved at assignment."""
     with repo.transaction():
-        previous = repo.get('games', request_id)
-        if previous:
-            if previous['franchise_id'] != fid:
-                raise RuleError('Submission ID belongs to another franchise.')
-            return previous['id']
-        f = repo.get('franchises', fid)
-        run = repo.get('runs', f['current_run']) if f['current_run'] else None
-        if f['state'] != State.ACTIVE or not run or run['ended_at']:
-            raise RuleError('Game entry is blocked until the required workflow is finished.')
-        roster_check = validate(repo, fid, check_tasks=False)
-        if not roster_check.valid:
-            raise RuleError('Fix active roster arrangements before recording a game: ' + '; '.join(roster_check.errors))
-        if result not in ['W', 'L']:
-            raise RuleError('Choose W or L.')
-        if team_score is not None or opponent_score is not None:
-            if team_score is None or opponent_score is None or min(team_score, opponent_score) < 0:
-                raise RuleError('Enter both nonnegative scores or leave both blank.')
-            if team_score == opponent_score or (team_score > opponent_score) != (result == 'W'):
-                raise RuleError('Score must agree with win/loss result.')
-        game = dict(id=request_id, franchise_id=fid, run_id=run['id'], number=len(repo.list('games', fid, run['id'])) + 1,
-            result=result, opponent=opponent, team_score=team_score, opponent_score=opponent_score,
-            date=str(date or now()[:10]), notes=notes, created_at=now())
-        repo.put('games', game)
-        _save_lines(repo, fid, run, game, lines or [])
-        run['wins' if result == 'W' else 'losses'] += 1
-        milestone_sync(repo, f, run, request_id)
-        _route(repo, f, run, game)
-        evaluate(repo, fid, run['id'], request_id)
-        unlock_development(repo, fid, run['id'], request_id)
-        return request_id
+        player = repo.get('players', player_id)
+        run = repo.get('runs', run_id)
+
+        if (
+            not player
+            or player['franchise_id'] != fid
+            or not run
+            or run['franchise_id'] != fid
+            or player_id not in run['roster_ids']
+        ):
+            raise RuleError(
+                'Choose a player from this week’s roster.'
+            )
+
+        if game_id:
+            game = repo.get('games', game_id)
+            if (
+                not game
+                or game['franchise_id'] != fid
+                or game['run_id'] != run_id
+            ):
+                raise RuleError('Invalid development source game.')
+
+        challenges = repo.list('challenges', fid)
+
+        already_open = any(
+            challenge['player_id'] == player_id
+            and challenge.get('reward') == 'upgrade'
+            and challenge['status'] in OPEN_STATUSES
+            for challenge in challenges
+        )
+        earned_this_week = any(
+            challenge['player_id'] == player_id
+            and challenge.get('reward') == 'upgrade'
+            and challenge.get('breakout_run') == run_id
+            for challenge in challenges
+        )
+        upgrade_waiting = any(
+            move.get('target') == player_id
+            and move['type'] == 'upgrade'
+            and move['status'] in ['pending', 'deferred']
+            for move in repo.list('moves', fid)
+        )
+
+        if already_open or earned_this_week or upgrade_waiting:
+            return None
+
+        if player['kind'] == 'hitter':
+            goals = {'hr': 2, 'h': 4}
+            goal_text = 'Hit 2 home runs OR collect 4 hits'
+        else:
+            goals = {'so': 5}
+            goal_text = 'Record 5 strikeouts'
+
+        cid = create(
+            repo,
+            fid,
+            run_id,
+            player_id,
+            'Development: '
+            + goal_text
+            + ' within the next 3 team games to earn '
+            'the next available higher-rated Event-legal '
+            'card of this player.',
+            scope='three_games',
+            reward='upgrade',
+            game_id=game_id,
+        )
+
+        challenge = repo.get('challenges', cid)
+        challenge.update(
+            goals=goals,
+            game_limit=3,
+            excluded_game_ids=[
+                game['id']
+                for game in repo.list('games', fid)
+            ],
+            breakout_run=run_id,
+            breakout_game=game_id,
+            development_reason=reason,
+        )
+        repo.put('challenges', challenge)
+        return cid
 
 
-def correct_game(repo, fid, gid, lines, reason, result=None):
-    """Stats can always be corrected. Outcome correction is limited to an unprocessed latest game.
+def unlock_development(repo, fid, run_id, game_id):
+    """Check saved performances after each new game."""
+    for stat in repo.list('stats', fid, run_id):
+        if stat['game_id'] != game_id:
+            continue
 
-    Historical wheel outcomes are never rewound. Dependent outcome edits require
-    a new explicit administrative workflow in V2; refusing is safer than replaying spins.
-    """
-    with repo.transaction():
-        game = repo.get('games', gid)
-        if not game or game['franchise_id'] != fid or not reason.strip():
-            raise RuleError('Valid game and correction reason required.')
-        before = dict(game=game, stats=[s for s in repo.list('stats', fid, game['run_id']) if s['game_id'] == gid])
-        run = repo.get('runs', game['run_id'])
-        f = repo.get('franchises', fid)
-        changed = result is not None and result != game['result']
-        if changed:
-            if result not in ['W', 'L']:
-                raise RuleError('Choose W or L.')
-            if f['current_run'] != run['id'] or repo.list('games', fid, run['id'])[-1]['id'] != gid:
-                raise RuleError('Outcome corrections are limited to the latest game of the current run.')
-            if any(s.get('game_id') == gid for s in repo.list('spins', fid)) or run.get('offseason_step'):
-                raise RuleError('Dependent wheels/offseason already processed. Stats correction remains available; outcome rewind is unsupported in V1.')
-            f['queue'] = [j for j in f['queue'] if j.get('game_id') != gid]
-            run['wins' if game['result'] == 'W' else 'losses'] -= 1
-            run['wins' if result == 'W' else 'losses'] += 1
-            game.update(result=result, team_score=None, opponent_score=None)
-            milestone_sync(repo, f, run, gid)
-            _route(repo, f, run, game)
-        repo.put('games', game)
-        for row in before['stats']:
-            repo.delete('stats', row['id'])
-        _save_lines(repo, fid, run, game, lines)
-        evaluate(repo, fid, run['id'], gid)
-        audit(repo, fid, 'correct_game', before,
-              dict(game=game, stats=[s for s in repo.list('stats', fid, run['id']) if s['game_id'] == gid]), reason, run['id'])
+        player = repo.get('players', stat['player_id'])
+        if not player:
+            continue
+
+        line = stat['line']
+
+        if player['kind'] == 'hitter':
+            breakout = (
+                line.get('hr', 0) >= 1
+                or line.get('h', 0) >= 2
+            )
+        elif line.get('starts', 0):
+            breakout = (
+                line.get('outs', 0) >= 6
+                and line.get('er', 0) == 0
+                and line.get('so', 0) >= 3
+            )
+        else:
+            breakout = (
+                line.get('outs', 0) >= 3
+                and line.get('r', 0) == 0
+                and line.get('so', 0) >= 2
+            )
+
+        if breakout:
+            assign_development(
+                repo,
+                fid,
+                run_id,
+                player['id'],
+                game_id=game_id,
+                reason='Saved breakout stat line',
+            )
