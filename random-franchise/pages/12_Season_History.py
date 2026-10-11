@@ -187,6 +187,69 @@ def render(repo, f):
                 st.error(str(exc))
             else:
                 st.rerun()
+    with st.expander('Correct the season of an imported week'):
+        from models.domain import RuleError
+        from services.historical_import import move_historical_week
+
+        imported = [
+            week for week in weeks
+            if week.get('recovered')
+            and week.get('offseason_step') == 'historical_complete'
+            and week['id'] != f.get('current_run')
+        ]
+
+        destinations = [
+            sid for sid in season_ids if sid != selected
+        ]
+
+        if not imported:
+            st.info('No imported historical weeks in this season to move.')
+        elif not destinations:
+            st.info('Another season is needed to move a week.')
+        else:
+            imported_by_id = {
+                week['id']: week for week in imported
+            }
+
+            moving_id = st.selectbox(
+                'Imported week to move',
+                list(imported_by_id),
+                format_func=lambda rid: (
+                    f"Week {imported_by_id[rid]['week_number']} · "
+                    f"{imported_by_id[rid]['wins']}–"
+                    f"{imported_by_id[rid]['losses']}"
+                ),
+                key='move_week:' + fid + ':' + selected,
+            )
+
+            destination = st.selectbox(
+                'Move to season',
+                destinations,
+                format_func=lambda sid: (
+                    f"Season {choices[sid]['number']} · "
+                    f"{choices[sid]['name']}"
+                ),
+                key='move_destination:' + fid + ':' + selected,
+            )
+
+            confirmed_move = st.checkbox(
+                'I confirm moving this week and its stats to this season.',
+                key='move_confirm:' + fid + ':' + selected,
+            )
+
+            if st.button(
+                'Move imported week',
+                disabled=not confirmed_move,
+                key='move_apply:' + fid + ':' + selected,
+            ):
+                try:
+                    move_historical_week(
+                        repo, fid, moving_id, destination
+                    )
+                except RuleError as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
     st.subheader('Weekly results')
     rows = []
     for week in weeks:
