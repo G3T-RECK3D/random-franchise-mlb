@@ -7,11 +7,13 @@ from services.franchise_tag_service import grant
 
 HITTER_GOALS = [
     ('hr', 2, 'Hit 2 home runs'),
-    ('h', 3, 'Collect 3 hits'),
-    ('extra_base_hits', 2, 'Record 2 extra-base hits'),
-    ('rbi', 3, 'Drive in 3 RBI'),
-    ('times_on_base', 4, 'Reach base 4 times through hits, walks, or HBP'),
+    ('h', 4, 'Collect 4 hits'),
+    ('extra_base_hits', 3, 'Record 3 extra-base hits'),
+    ('rbi', 4, 'Drive in 4 RBI'),
+    ('times_on_base', 5, 'Reach base 5 times through hits, walks, or HBP'),
 ]
+
+DEVELOPMENT_LIMIT_PER_SEASON = 2
 
 OPEN_STATUSES = [
     'waiting_next_run',
@@ -68,7 +70,7 @@ def create(
 
 
 def development_progress(repo, challenge):
-    """Retain support for any three-game challenges already assigned."""
+    """Retain support for previously assigned three-game challenges."""
     excluded = set(challenge.get('excluded_game_ids', []))
     games = [
         game
@@ -104,12 +106,16 @@ def development_progress(repo, challenge):
 
 def evaluate(repo, fid, run_id, game_id):
     game = repo.get('games', game_id)
-    if not game or game['franchise_id'] != fid:
+    if (
+        not game
+        or game['franchise_id'] != fid
+        or game['run_id'] != run_id
+    ):
         raise RuleError('Select a valid game.')
 
     for challenge in repo.list('challenges', fid):
         if challenge['status'] not in [
-            'active', 'passed', 'failed', 'awaiting_manual'
+            'active', 'passed', 'failed', 'awaiting_manual',
         ]:
             continue
 
@@ -169,9 +175,7 @@ def evaluate(repo, fid, run_id, game_id):
             )
 
             if passed or closed:
-                challenge['status'] = (
-                    'passed' if passed else 'failed'
-                )
+                challenge['status'] = 'passed' if passed else 'failed'
             else:
                 challenge['status'] = 'active'
 
@@ -282,16 +286,79 @@ def confirm_manual(repo, fid, cid, passed, evidence):
         )
 
 
+def _development_season(challenge, runs_by_id):
+    """Use the season in which the challenge was earned."""
+    if challenge.get('development_season_id'):
+        return challenge['development_season_id']
+
+    source_run = runs_by_id.get(
+        challenge.get('breakout_run') or challenge.get('run_id')
+    )
+    return source_run.get('season_id') if source_run else None
+
+
+def _development_allowed(repo, fid, season_id):
+    challenges = [
+        challenge
+        for challenge in repo.list('challenges', fid)
+        if challenge.get('reward') == 'upgrade'
+    ]
+
+    # Existing challenges also block new assignments until they finish.
+    if any(
+        challenge['status'] in OPEN_STATUSES
+        for challenge in challenges
+    ):
+        return False
+
+    runs_by_id = {
+        run['id']: run for run in repo.list('runs', fid)
+    }
+    assigned_this_season = sum(
+        _development_season(challenge, runs_by_id) == season_id
+        for challenge in challenges
+    )
+
+    # Failed challenges count as attempts too.
+    return assigned_this_season < DEVELOPMENT_LIMIT_PER_SEASON
+
+
+def _player_can_develop(repo, fid, run_id, player_id):
+    challenges = repo.list('challenges', fid)
+
+    if any(
+        challenge['player_id'] == player_id
+        and challenge.get('reward') == 'upgrade'
+        and (
+            challenge['status'] in OPEN_STATUSES
+            or challenge.get('breakout_run') == run_id
+        )
+        for challenge in challenges
+    ):
+        return False
+
+    if any(
+        move.get('target') == player_id
+        and move['type'] == 'upgrade'
+        and move['status'] in ['pending', 'deferred']
+        for move in repo.list('moves', fid)
+    ):
+        return False
+
+    return True
+
+
 def assign_development(
     repo, fid, run_id, player_id,
     game_id=None,
     reason='Breakout performance',
     goal=None,
 ):
-    """Assign one fixed goal for the entire next run."""
+    """Assign a next-week goal subject to franchise development limits."""
     with repo.transaction():
         player = repo.get('players', player_id)
         run = repo.get('runs', run_id)
+        franchise = repo.get('franchises', fid)
 
         if (
             not player
@@ -302,6 +369,21 @@ def assign_development(
         ):
             raise RuleError('Choose a player from this week’s roster.')
 
+        season_id = run.get('season_id')
+        season = (
+            repo.get('seasons', season_id) if season_id else None
+        )
+        if (
+            not franchise
+            or not season
+            or season['franchise_id'] != fid
+            or franchise.get('current_season') != season_id
+            or season.get('status') != 'active'
+        ):
+            raise RuleError(
+                'Development must be earned in the current active season.'
+            )
+
         if game_id:
             game = repo.get('games', game_id)
             if (
@@ -311,28 +393,13 @@ def assign_development(
             ):
                 raise RuleError('Invalid development source game.')
 
-        challenges = repo.list('challenges', fid)
-        already_open = any(
-            challenge['player_id'] == player_id
-            and challenge.get('reward') == 'upgrade'
-            and challenge['status'] in OPEN_STATUSES
-            for challenge in challenges
-        )
-        earned_this_week = any(
-            challenge['player_id'] == player_id
-            and challenge.get('reward') == 'upgrade'
-            and challenge.get('breakout_run') == run_id
-            for challenge in challenges
-        )
-        upgrade_waiting = any(
-            move.get('target') == player_id
-            and move['type'] == 'upgrade'
-            and move['status'] in ['pending', 'deferred']
-            for move in repo.list('moves', fid)
-        )
-
-        if already_open or earned_this_week or upgrade_waiting:
+        if not _development_allowed(repo, fid, season_id):
             return None
+
+        if not _player_can_develop(repo, fid, run_id, player_id):
+            return None
+
+        pitcher_role = None
 
         if player['kind'] == 'hitter':
             if goal is None:
@@ -347,12 +414,32 @@ def assign_development(
                 )
                 if selected is None:
                     raise RuleError('Unknown hitter development goal.')
+
             metric, threshold, goal_text = selected
+
         else:
             if goal not in [None, 'so']:
                 raise RuleError('Unknown pitcher development goal.')
-            metric, threshold = 'so', 5
-            goal_text = 'Record 5 strikeouts'
+
+            # Use the role from the breakout appearance when available.
+            source_stats = [
+                stat
+                for stat in repo.list('stats', fid, run_id)
+                if stat['player_id'] == player_id
+                and game_id
+                and stat['game_id'] == game_id
+            ]
+
+            is_starter = (
+                bool(source_stats[0]['line'].get('starts', 0))
+                if source_stats
+                else player['area'] == 'rotation'
+            )
+
+            pitcher_role = 'starter' if is_starter else 'reliever'
+            metric = 'so'
+            threshold = 6 if is_starter else 4
+            goal_text = f'Record {threshold} strikeouts'
 
         cid = create(
             repo, fid, run_id, player_id,
@@ -367,48 +454,95 @@ def assign_development(
             reward='upgrade',
             game_id=game_id,
         )
+
         challenge = repo.get('challenges', cid)
         challenge.update(
             breakout_run=run_id,
             breakout_game=game_id,
+            development_season_id=season_id,
             development_reason=reason,
+            development_rules_version=2,
         )
+        if pitcher_role:
+            challenge['development_pitcher_role'] = pitcher_role
+
         repo.put('challenges', challenge)
         return cid
 
 
 def unlock_development(repo, fid, run_id, game_id):
-    """Unlock challenges from newly saved breakout performances."""
-    for stat in repo.list('stats', fid, run_id):
-        if stat['game_id'] != game_id:
-            continue
+    """Award at most one challenge from a qualifying saved game."""
+    with repo.transaction():
+        run = repo.get('runs', run_id)
+        game = repo.get('games', game_id)
+        franchise = repo.get('franchises', fid)
 
-        player = repo.get('players', stat['player_id'])
-        if not player:
-            continue
+        if (
+            not run
+            or run['franchise_id'] != fid
+            or not game
+            or game['franchise_id'] != fid
+            or game['run_id'] != run_id
+        ):
+            raise RuleError('Invalid development source game.')
 
-        line = stat['line']
-        if player['kind'] == 'hitter':
-            breakout = (
-                line.get('hr', 0) >= 1
-                or line.get('h', 0) >= 2
-            )
-        elif line.get('starts', 0):
-            breakout = (
-                line.get('outs', 0) >= 6
-                and line.get('er', 0) == 0
-                and line.get('so', 0) >= 3
-            )
-        else:
-            breakout = (
-                line.get('outs', 0) >= 3
-                and line.get('r', 0) == 0
-                and line.get('so', 0) >= 2
-            )
+        season_id = run.get('season_id')
+        if (
+            not franchise
+            or not season_id
+            or franchise.get('current_season') != season_id
+            or game.get('recovered')
+        ):
+            return
 
-        if breakout:
+        if not _development_allowed(repo, fid, season_id):
+            return
+
+        candidates = []
+
+        for stat in repo.list('stats', fid, run_id):
+            if stat['game_id'] != game_id:
+                continue
+
+            player = repo.get('players', stat['player_id'])
+            if (
+                not player
+                or player['franchise_id'] != fid
+                or not _player_can_develop(
+                    repo, fid, run_id, player['id'],
+                )
+            ):
+                continue
+
+            line = stat['line']
+            if player['kind'] == 'hitter':
+                breakout = (
+                    line.get('hr', 0) >= 1
+                    or line.get('h', 0) >= 2
+                )
+
+            elif line.get('starts', 0):
+                breakout = (
+                    line.get('outs', 0) >= 6
+                    and line.get('er', 0) == 0
+                    and line.get('so', 0) >= 3
+                )
+
+            else:
+                breakout = (
+                    line.get('outs', 0) >= 3
+                    and line.get('r', 0) == 0
+                    and line.get('so', 0) >= 2
+                )
+
+            if breakout:
+                candidates.append(player['id'])
+
+        if candidates:
+            # Avoid favoring whoever appears first in the stat-entry table.
+            player_id = secrets.choice(candidates)
             assign_development(
-                repo, fid, run_id, player['id'],
+                repo, fid, run_id, player_id,
                 game_id=game_id,
                 reason='Saved breakout stat line',
             )
