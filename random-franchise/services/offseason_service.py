@@ -8,7 +8,22 @@ from services.stat_engine import aggregate
 from services.challenge_service import create
 from services.reunion_service import reunion_pool
 
+def confirm_end(repo, fid):
+    with repo.transaction():
+        f = repo.get('franchises', fid)
+        if not f or f['state'] != State.ENDED:
+            raise RuleError('No ended week to confirm.')
 
+        run = repo.get('runs', f.get('current_run'))
+        if not run or run['franchise_id'] != fid:
+            raise RuleError('The ended week could not be found.')
+
+        run['offseason_step'] = 'mvp'
+        f['state'] = State.MVP
+
+        repo.put('runs', run)
+        repo.put('franchises', f)
+        
 def trade_position_options(kind):
     if kind == 'hitter':
         groups = {
