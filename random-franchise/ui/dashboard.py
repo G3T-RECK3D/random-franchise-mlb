@@ -204,8 +204,28 @@ def add_styles():
             stroke="#ff334f" stroke-width="2" opacity=".15"/>
     </svg>
     '''
-    background_url = (
-        'data:image/svg+xml;charset=utf-8,' + quote(skyline)
+    import base64
+    from pathlib import Path
+
+    image_path = (
+        Path(__file__).resolve().parents[1]
+        / 'assets'
+        / 'stadium_background.png'
+    )
+
+    if image_path.is_file():
+        image_data = base64.b64encode(
+            image_path.read_bytes()
+        ).decode('ascii')
+        background_url = 'data:image/png;base64,' + image_data
+    else:
+        background_url = (
+            'data:image/svg+xml;charset=utf-8,' + quote(skyline)
+        )
+        st.warning(
+            'Upload assets/stadium_background.png '
+            'to display the cinematic background.'
+        )
     )
 
     css = '''
