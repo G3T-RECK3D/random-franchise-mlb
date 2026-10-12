@@ -49,6 +49,9 @@ LEGACY_CARD_ART = {
     ('cam schlittler', 98): 'ebb513f936b81fb5910c21d7687cbcad',
     ('anthony seigler', 67): '3675fe0474e7202d802666cb405a3ffa',
     ('junior caminero', 87): '5f74a86f361c5124d1ef06cbabad638e',
+    ('freddie freeman', 83): 'b304748509db213a30a08c2c0b3eba5b',
+    ('clay buchholz', 83): '327387c1d18a25be5d41b963101818ff',
+    ('clay bucholz', 83): '327387c1d18a25be5d41b963101818ff',
 }
 
 
