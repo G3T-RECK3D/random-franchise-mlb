@@ -4,7 +4,11 @@ import json
 import streamlit as st
 
 from models.domain import State, RuleError, POSITIONS, ACTIVE_AREAS
-from services.offseason_service import resolve_move, trade_card_errors
+from services.offseason_service import trade_card_errors
+from services.acquisition_service import (
+    resolve_banked_move as resolve_move,
+    incoming_card_errors,
+)
 from services.roster_service import locked, target_pool
 from services.franchise_service import settings
 from services.roster_validator import card_event_errors
@@ -20,7 +24,7 @@ COLD_BAT_TYPES = {
 }
 
 TYPE_LABELS = {
-    'acquire': 'Add a player',
+    'acquire': 'Add or upgrade a player',
     'trade': 'Trade a player',
     'reunion': 'Reunion Signing',
     'save_dfa': 'Save a player from DFA',
@@ -110,7 +114,7 @@ def show_card(player, heading):
         )
 
 
-def parse_cards(text, single=False):
+def parse_cards(text):
     try:
         parsed = json.loads(text)
     except ValueError:
@@ -127,11 +131,6 @@ def parse_cards(text, single=False):
         raise RuleError(
             'Provide a card object or a JSON list of card objects.'
         )
-
-    if single:
-        if len(parsed) != 1:
-            raise RuleError('Provide exactly one card object.')
-        return dict(parsed[0])
 
     return [dict(card) for card in parsed]
 
@@ -425,6 +424,25 @@ def review_lines(move, payload, players, moves, removal_pool):
         ]
 
     if kind == 'acquire':
+        if payload['upgrade_player_id']:
+            recipient = players[payload['upgrade_player_id']]
+
+            return [
+                recipient['name']
+                + f" → {new['ovr']} OVR · {new['version']}",
+                'Update the same player ID. Keep their roster '
+                'assignment and accumulated stats.',
+            ]
+
+        if payload['incoming_player_id']:
+            incoming = players[payload['incoming_player_id']]
+
+            return [
+                incoming['name'] + ' → use existing Minors card',
+                'Keep the existing ID and stats. Arrange the '
+                'card in Roster Manager afterward.',
+            ]
+
         return [
             card['name'] + ' → Minors (new card)'
             for card in new
@@ -456,8 +474,7 @@ def review_lines(move, payload, players, moves, removal_pool):
             and move.get('constraints', {}).get('fallback') == 'protection'
         ):
             return [
-                name
-                + ' → temporary protection '
+                name + ' → temporary protection '
                 '(no higher legal card available)'
             ]
 
@@ -469,8 +486,7 @@ def review_lines(move, payload, players, moves, removal_pool):
     if kind == 'downgrade':
         if payload['no_lower_card_confirmed']:
             return [
-                name
-                + ' → Hot Seat next week '
+                name + ' → Hot Seat next week '
                 '(no lower legal card available)'
             ]
 
@@ -608,8 +624,9 @@ def render(repo, f):
         p['id'] for p in target_pool(repo, fid)
     ]
 
-    ordered = required + optional
-    choices = {m['id']: m for m in ordered}
+    choices = {
+        m['id']: m for m in required + optional
+    }
 
     mid = st.selectbox(
         'Move to resolve',
@@ -656,6 +673,57 @@ def render(repo, f):
         key='resolution:' + mid,
     )
 
+    acquisition_method = 'Add a new card'
+    upgrade_pid = None
+
+    if kind == 'acquire' and action == 'resolved':
+        methods = [
+            'Existing card from Minors',
+            'Add a new card',
+            'Upgrade an existing player’s card',
+        ]
+
+        if rules.get('quantity', 1) != 1:
+            methods = ['Add a new card']
+            st.caption(
+                'This reward requires multiple incoming cards; '
+                'enter each new card below.'
+            )
+
+        acquisition_method = st.radio(
+            'How to use this acquisition reward',
+            methods,
+            index=methods.index('Add a new card'),
+            key='acquire_method:' + mid,
+        )
+
+        if acquisition_method == 'Upgrade an existing player’s card':
+            upgrade_ids = [
+                p['id']
+                for p in players
+                if p['area'] in ACTIVE_AREAS
+                and (
+                    not rules.get('kind')
+                    or p['kind'] == rules['kind']
+                )
+            ]
+
+            upgrade_pid = st.selectbox(
+                'Existing player to upgrade',
+                [None] + upgrade_ids,
+                format_func=lambda i: labels.get(
+                    i, 'Choose a player'
+                ),
+                key='acquire_upgrade:' + mid,
+            )
+
+            st.caption(
+                'Use the same player’s higher-rated Event-legal card. '
+                'For a worst-position reward, select the player at '
+                'that position and explain your choice in the notes. '
+                'This consumes the acquisition reward.'
+            )
+
     target = None
 
     if fixed:
@@ -671,7 +739,6 @@ def render(repo, f):
 
         if original and original['id'] in pool_ids:
             target = original['id']
-
             st.caption(
                 'The outgoing player is fixed '
                 'by the audited wheel result.'
@@ -726,7 +793,12 @@ def render(repo, f):
             key='target:' + mid,
         )
 
-    selected = by_id.get(target) or original
+    selected = (
+        by_id.get(upgrade_pid)
+        if upgrade_pid
+        else by_id.get(target) or original
+    )
+
     replacement = None
     cancel_id = None
 
@@ -820,18 +892,15 @@ def render(repo, f):
             if fallback:
                 if kind == 'downgrade':
                     st.caption('Fallback: Hot Seat next week.')
-
                     lower_confirmed = st.checkbox(
                         'I verified no lower-rated Event-legal card exists.',
                         key='lower:' + mid,
                     )
-
                 else:
                     st.caption(
                         'Fallback: temporary protection. '
                         'The MVP reward cannot transfer.'
                     )
-
                     max_confirmed = st.checkbox(
                         'I verified no higher-rated Event-legal card exists.',
                         key='max:' + mid,
@@ -909,14 +978,64 @@ def render(repo, f):
                     'It stays in Minors until arranged.'
                 )
 
-        needs_card = (
+        if (
             kind == 'acquire'
+            and acquisition_method == 'Existing card from Minors'
+        ):
+            eligible = [
+                p
+                for p in players
+                if p['area'] == 'minors'
+                and not incoming_card_errors(repo, fid, move, p)
+            ]
+
+            incoming_labels = {
+                p['id']: player_label(p)
+                for p in eligible
+            }
+
+            incoming_id = st.selectbox(
+                'Incoming card from Minors',
+                [None] + list(incoming_labels),
+                format_func=lambda i: incoming_labels.get(
+                    i, 'Choose an incoming card'
+                ),
+                key='incoming:' + mid,
+            )
+
+            incoming_preview = by_id.get(incoming_id)
+
+            if not eligible:
+                st.warning(
+                    'No Minors cards meet this reward’s saved restrictions. '
+                    'Check Event eligibility and card details.'
+                )
+
+            st.caption(
+                'Reuses the existing card and stats. '
+                'It stays in Minors until arranged.'
+            )
+
+        acquire_upgrade = (
+            kind == 'acquire'
+            and acquisition_method == 'Upgrade an existing player’s card'
+        )
+
+        needs_card = (
+            (
+                kind == 'acquire'
+                and acquisition_method != 'Existing card from Minors'
+            )
             or (kind == 'trade' and not existing_trade)
             or (kind in ['upgrade', 'downgrade'] and not fallback)
         )
 
         if needs_card:
-            changing = kind in ['upgrade', 'downgrade']
+            changing = (
+                kind in ['upgrade', 'downgrade']
+                or acquire_upgrade
+            )
+
             seed = template(move, selected, changing)
 
             entry = st.radio(
@@ -934,9 +1053,7 @@ def render(repo, f):
                 incoming_cards = []
 
                 for index in range(quantity):
-                    st.markdown(
-                        f'**Card {index + 1} details**'
-                    )
+                    st.markdown(f'**Card {index + 1} details**')
 
                     incoming_cards.append(
                         card_fields(
@@ -965,11 +1082,10 @@ def render(repo, f):
                 try:
                     incoming_cards = parse_cards(incoming_json)
                     incoming_preview = incoming_cards[0]
-
                 except RuleError as exc:
                     field_errors.append(str(exc))
 
-            if changing:
+            if changing and not acquire_upgrade:
                 next_confirmed = st.checkbox(
                     'I verified this is the next available '
                     + ('lower' if kind == 'downgrade' else 'higher')
@@ -981,6 +1097,14 @@ def render(repo, f):
                     'Updates the existing player entry and preserves stats. '
                     'New artwork details are optional; old version '
                     'artwork is cleared when omitted.'
+                )
+
+            elif acquire_upgrade:
+                st.caption(
+                    'Enter the higher-rated version. The player stays '
+                    'in their current roster slot and keeps their stats. '
+                    'Old artwork is cleared when new artwork details '
+                    'are omitted.'
                 )
 
             else:
@@ -1028,13 +1152,18 @@ def render(repo, f):
         cancel_move_id=cancel_id,
         max_card_confirmed=max_confirmed,
         incoming_player_id=None,
+        upgrade_player_id=None,
         no_lower_card_confirmed=lower_confirmed,
         next_card_confirmed=next_confirmed,
     )
 
     if action == 'resolved':
         payload['incoming_player_id'] = (
-            incoming_id if kind == 'trade' else None
+            incoming_id if kind in ['trade', 'acquire'] else None
+        )
+
+        payload['upgrade_player_id'] = (
+            upgrade_pid if kind == 'acquire' else None
         )
 
         if incoming_cards is not None:
@@ -1046,6 +1175,7 @@ def render(repo, f):
             payload['new_player'] = (
                 cards
                 if kind == 'acquire'
+                and acquisition_method == 'Add a new card'
                 else cards[0]
                 if len(cards) == 1
                 else cards
@@ -1095,6 +1225,24 @@ def render(repo, f):
                         'Choose an incoming card or enter its details.'
                     )
 
+                if kind == 'acquire':
+                    if (
+                        acquisition_method == 'Existing card from Minors'
+                        and not incoming_id
+                    ):
+                        raise RuleError(
+                            'Choose an existing card from Minors.'
+                        )
+
+                    if (
+                        acquisition_method
+                        == 'Upgrade an existing player’s card'
+                        and not upgrade_pid
+                    ):
+                        raise RuleError(
+                            'Choose the existing player to upgrade.'
+                        )
+
                 if kind in ['upgrade', 'downgrade']:
                     if (
                         fallback
@@ -1142,12 +1290,46 @@ def render(repo, f):
                             )
 
                         if kind in ['trade', 'acquire']:
-                            errors = card_event_errors(
-                                card, settings(repo, fid)
+                            errors = (
+                                incoming_card_errors(
+                                    repo, fid, move, card
+                                )
+                                if kind == 'acquire'
+                                else card_event_errors(
+                                    card, settings(repo, fid)
+                                )
                             )
 
                             if errors:
                                 raise RuleError(' '.join(errors))
+
+                if (
+                    kind == 'acquire'
+                    and acquisition_method
+                    == 'Upgrade an existing player’s card'
+                ):
+                    if not isinstance(new, dict) or not selected:
+                        raise RuleError(
+                            'Enter one upgraded card for the selected player.'
+                        )
+
+                    if (
+                        new.get('name', '').strip().casefold()
+                        != selected['name'].strip().casefold()
+                        or new.get('kind') != selected['kind']
+                    ):
+                        raise RuleError(
+                            'The upgraded card must be '
+                            'the same player and type.'
+                        )
+
+                    if (
+                        type(new.get('ovr')) is not int
+                        or new['ovr'] <= selected['ovr']
+                    ):
+                        raise RuleError(
+                            'Enter a higher OVR for the upgraded version.'
+                        )
 
                 if kind == 'trade':
                     incoming = by_id.get(incoming_id) or new
