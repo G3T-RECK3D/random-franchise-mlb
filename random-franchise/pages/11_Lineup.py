@@ -1,4 +1,5 @@
 import html
+import math
 import re
 import unicodedata
 from urllib.parse import urlsplit
@@ -51,7 +52,7 @@ LEGACY_CARD_ART = {
 }
 
 
-def card_avatar(player, initials):
+def card_image_url(player):
     name = text_key(player.get('name'))
     try:
         overall = int(player.get('ovr', 0))
@@ -60,40 +61,41 @@ def card_avatar(player, initials):
 
     series = text_key(player.get('series'))
     version = text_key(player.get('version'))
-
     card_id = (
         CARD_ART.get((name, overall, series))
         or CARD_ART.get((name, overall, version))
         or LEGACY_CARD_ART.get((name, overall))
     )
 
-    url = None
-
     if card_id:
-        url = (
+        return (
             f'https://cards.theshow.com/mlb26/'
             f'{card_id}-baked-lg.webp'
         )
-    else:
-        saved_url = player.get('card_image_url')
-        if isinstance(saved_url, str):
-            saved_url = saved_url.strip()
-            parsed = urlsplit(saved_url)
-            if parsed.scheme == 'https' and parsed.netloc:
-                url = saved_url
 
-        if not url:
-            saved_id = player.get('card_uuid')
-            if (
-                isinstance(saved_id, str)
-                and re.fullmatch(r'[a-fA-F0-9]{32}', saved_id.strip())
-            ):
-                url = (
-                    'https://cards.theshow.com/mlb26/'
-                    + saved_id.strip()
-                    + '-baked-lg.webp'
-                )
+    saved_url = player.get('card_image_url')
+    if isinstance(saved_url, str):
+        saved_url = saved_url.strip()
+        parsed = urlsplit(saved_url)
+        if parsed.scheme == 'https' and parsed.netloc:
+            return saved_url
 
+    saved_id = player.get('card_uuid')
+    if (
+        isinstance(saved_id, str)
+        and re.fullmatch(r'[a-fA-F0-9]{32}', saved_id.strip())
+    ):
+        return (
+            'https://cards.theshow.com/mlb26/'
+            + saved_id.strip()
+            + '-baked-lg.webp'
+        )
+
+    return None
+
+
+def card_avatar(player, initials):
+    url = card_image_url(player)
     if not url:
         return (
             '<div class="avatar">'
@@ -110,6 +112,199 @@ def card_avatar(player, initials):
         'onerror="this.style.display=\'none\'">'
         '</div>'
     )
+
+
+def show_gallery(players, area):
+    if not players:
+        st.info('No players assigned here yet.')
+        return
+
+    columns = min(
+        5 if area == 'rotation' else 4,
+        len(players),
+    )
+    cards = []
+
+    for player in players:
+        order = player.get('order', 1)
+        role = (
+            f'SP {order}' if area == 'rotation'
+            else f'Bench {order}' if area == 'bench'
+            else f'Bullpen {order}'
+        )
+        initials = ''.join(
+            word[0] for word in player['name'].split()[:2]
+        ).upper()
+        series = (
+            player.get('series')
+            or player.get('version')
+            or 'Card'
+        )
+        position = (
+            player.get('position')
+            or player.get('primary')
+            or ''
+        )
+        primary = player.get('primary') or ''
+
+        cards.append(
+            '<article class="roster-card">'
+            '<div class="card-top"><span class="role">'
+            + html.escape(role)
+            + '</span><span class="ovr">'
+            + html.escape(str(player['ovr']))
+            + ' OVR</span></div>'
+            '<div class="art-frame">'
+            + card_avatar(player, initials)
+            + '</div><div class="card-name">'
+            + html.escape(player['name'])
+            + '</div><div class="card-series">'
+            + html.escape(str(series))
+            + '</div><div class="card-position">'
+            + html.escape(str(position))
+            + ' · Primary: '
+            + html.escape(str(primary))
+            + '</div></article>'
+        )
+
+    css = '''
+    <style>
+    body {
+        margin:0;
+        font-family:Arial,sans-serif;
+        color:#f7f4ed;
+    }
+    .gallery {
+        display:grid;
+        grid-template-columns:repeat(COLS,minmax(0,1fr));
+        gap:14px;
+        min-width:MINWIDTHpx;
+        padding:7px 3px 12px;
+    }
+    .roster-card {
+        box-sizing:border-box;
+        padding:12px;
+        text-align:center;
+        border:1px solid #68503a;
+        border-top:3px solid #ef334f;
+        border-radius:12px;
+        background:
+            radial-gradient(
+                ellipse at top right,#ab273b30,transparent 65%
+            ),
+            linear-gradient(145deg,#1e2430,#0b111b);
+        overflow:hidden;
+        transition:border-color .2s,box-shadow .2s;
+    }
+    .roster-card:hover {
+        border-color:#edc575;
+        box-shadow:0 0 15px #edc57522;
+    }
+    .card-top {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:6px;
+        margin-bottom:12px;
+    }
+    .role {
+        font-size:10px;
+        font-weight:bold;
+        letter-spacing:.6px;
+        color:#ffb7c2;
+    }
+    .ovr {
+        font-size:10px;
+        font-weight:bold;
+        background:#ebc16e;
+        color:#161b25;
+        padding:5px 7px;
+        border-radius:5px;
+        white-space:nowrap;
+    }
+    .art-frame {
+        height:190px;
+        display:grid;
+        place-items:center;
+        margin-bottom:12px;
+    }
+    .card-art,.avatar {
+        position:relative;
+        width:134px;
+        height:186px;
+        display:grid;
+        place-items:center;
+        border-radius:7px;
+        font-size:34px;
+        font-weight:bold;
+        color:#f1cc83;
+        background:linear-gradient(145deg,#422632,#151d2d);
+        border:1px solid #826643;
+        box-sizing:border-box;
+    }
+    .card-art img {
+        position:absolute;
+        inset:0;
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        border-radius:6px;
+    }
+    .card-name {
+        font-size:14px;
+        font-weight:800;
+        line-height:1.3;
+        min-height:36px;
+    }
+    .card-series {
+        font-size:10px;
+        color:#edc575;
+        letter-spacing:.6px;
+        text-transform:uppercase;
+        line-height:1.4;
+        min-height:28px;
+        margin-top:3px;
+    }
+    .card-position {
+        font-size:10px;
+        color:#b6c0d0;
+        margin-top:7px;
+    }
+    @media(prefers-reduced-motion:reduce) {
+        .roster-card { transition:none; }
+    }
+    </style>
+    '''
+    css = css.replace('COLS', str(columns)).replace(
+        'MINWIDTH', str(columns * 165)
+    )
+    rows = math.ceil(len(players) / columns)
+
+    components.html(
+        css
+        + '<div class="gallery">'
+        + ''.join(cards)
+        + '</div>',
+        height=rows * 350 + 30,
+        scrolling=True,
+    )
+    st.caption(
+        'Cards follow your saved roster order. '
+        'On smaller screens, scroll sideways to see the row.'
+    )
+
+    with st.expander('Roster details'):
+        table([
+            {
+                'Order': player.get('order', ''),
+                'Player': player['name'],
+                'Position': player['position'],
+                'OVR': player['ovr'],
+                'Series': player.get('series', ''),
+                'Version': player.get('version', ''),
+            }
+            for player in players
+        ])
 
 
 def render(repo, f):
@@ -181,7 +376,6 @@ def render(repo, f):
 
         occupied.add(position)
         x, y = positions[position]
-
         initials = ''.join(
             word[0] for word in player['name'].split()[:2]
         ).upper()
@@ -190,7 +384,9 @@ def render(repo, f):
             if player['kind'] == 'hitter' else ''
         )
         primary = str(player.get('primary') or 'Unknown')
-        series = str(player.get('series') or 'Series not entered')
+        series = str(
+            player.get('series') or 'Series not entered'
+        )
         secondary = player.get('secondary') or []
 
         if position == 'DH' or position == primary:
@@ -207,13 +403,11 @@ def render(repo, f):
             + '<div class="player-info">'
             + '<div class="name">'
             + html.escape(player['name'])
-            + '</div>'
-            + '<div class="details">'
+            + '</div><div class="details">'
             + html.escape(order + primary)
             + ' · '
             + html.escape(str(player['ovr']))
-            + ' OVR</div>'
-            + '<div class="version">'
+            + ' OVR</div><div class="version">'
             + html.escape(series)
             + '</div></div></div>'
         )
@@ -454,23 +648,29 @@ def render(repo, f):
             player['name'],
         ),
     )
-
-    for area, title in [
+    groups = [
         ('bench', 'Bench'),
         ('rotation', 'Starting rotation'),
         ('bullpen', 'Bullpen'),
-    ]:
-        st.subheader(title)
-        table([
-            {
-                'Player': player['name'],
-                'Position': player['position'],
-                'OVR': player['ovr'],
-                'Card': player['version'],
-            }
-            for player in ordered_players
-            if player['area'] == area
-        ])
+    ]
+    grouped = [
+        (
+            area,
+            title,
+            [p for p in ordered_players if p['area'] == area],
+        )
+        for area, title in groups
+    ]
+
+    st.subheader('Your dugout & pitching staff')
+    tabs = st.tabs([
+        f'{title} · {len(roster)}'
+        for area, title, roster in grouped
+    ])
+
+    for tab, (area, title, roster) in zip(tabs, grouped):
+        with tab:
+            show_gallery(roster, area)
 
     st.page_link(
         'pages/2_Roster_Manager.py',
