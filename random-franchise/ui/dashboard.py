@@ -16,7 +16,7 @@ def escape(value):
     return html.escape(str(value), quote=True)
 
 
-def normalized_name(value):
+def name_key(value):
     text = unicodedata.normalize(
         'NFKD', str(value or '').strip().casefold()
     )
@@ -29,7 +29,6 @@ def normalized_name(value):
 
 
 def player_art_url(player):
-    """Use known matching cards, then a saved card UUID."""
     cards = {
         ('lance berkman', 99, 'spotlight'):
             'f3ed2f8ef5616481987e95ce6cbb7e5c',
@@ -59,7 +58,7 @@ def player_art_url(player):
         ('junior caminero', 87): '5f74a86f361c5124d1ef06cbabad638e',
     }
 
-    name = normalized_name(player.get('name'))
+    name = name_key(player.get('name'))
     overall = player.get('ovr')
     series = str(player.get('series') or '').strip().casefold()
     version = str(player.get('version') or '').strip().casefold()
@@ -69,7 +68,6 @@ def player_art_url(player):
         or cards.get((name, overall, version))
         or legacy.get((name, overall))
     )
-
     if not identifier:
         saved = str(player.get('card_uuid') or '').strip()
         if re.fullmatch(r'[a-fA-F0-9]{32}', saved):
@@ -78,28 +76,29 @@ def player_art_url(player):
     if identifier:
         return (
             'https://cards.theshow.com/mlb26/'
-            + identifier
-            + '-baked-lg.webp'
+            + identifier + '-baked-lg.webp'
         )
     return None
 
 
-def add_dashboard_styles():
+def add_styles():
     st.markdown(
         """
         <style>
         .broadcast-hero {
-            position:relative;
             display:flex;
             align-items:center;
             justify-content:space-between;
             gap:24px;
-            padding:30px;
-            min-height:290px;
+            padding:24px 30px;
+            max-width:1200px;
+            margin:0 auto 18px;
+            min-height:245px;
+            box-sizing:border-box;
             overflow:hidden;
             border:1px solid #543b31;
             border-top:4px solid #d92640;
-            border-radius:18px;
+            border-radius:16px;
             background:
                 radial-gradient(
                     ellipse at 90% 10%,#9d233b55,transparent 50%
@@ -109,8 +108,6 @@ def add_dashboard_styles():
                     #ffffff03 66px,#ffffff03 68px
                 ),
                 linear-gradient(120deg,#171b25,#0c1018);
-            box-shadow:0 12px 30px #0003;
-            margin-bottom:20px;
         }
         .broadcast-copy {
             flex:1;
@@ -123,17 +120,12 @@ def add_dashboard_styles():
             letter-spacing:2px;
             text-transform:uppercase;
         }
-        .broadcast-franchise {
-            color:#c0c6d2;
-            font-size:13px;
-            margin-bottom:18px;
-        }
         .broadcast-name {
             color:#fff3d0;
-            font-size:clamp(27px,4vw,48px);
+            font-size:clamp(28px,4vw,44px);
             font-weight:900;
             line-height:1.1;
-            margin:10px 0 18px;
+            margin:10px 0 16px;
             overflow-wrap:anywhere;
         }
         .broadcast-stat-row {
@@ -142,8 +134,8 @@ def add_dashboard_styles():
             gap:10px;
         }
         .broadcast-stat {
-            min-width:72px;
-            padding:10px 15px;
+            min-width:65px;
+            padding:9px 14px;
             background:#080d16aa;
             border:1px solid #ffffff20;
             border-radius:9px;
@@ -152,8 +144,7 @@ def add_dashboard_styles():
         .broadcast-stat strong {
             display:block;
             color:white;
-            font-size:26px;
-            line-height:1.2;
+            font-size:25px;
         }
         .broadcast-stat span {
             color:#c9cdd6;
@@ -163,13 +154,13 @@ def add_dashboard_styles():
         .broadcast-note {
             color:#bbc3d1;
             font-size:13px;
-            margin-top:15px;
+            margin-top:14px;
             line-height:1.5;
         }
         .broadcast-art {
-            flex:0 0 175px;
-            width:175px;
-            height:245px;
+            flex:0 0 145px;
+            width:145px;
+            height:205px;
             position:relative;
             display:grid;
             place-items:center;
@@ -182,24 +173,24 @@ def add_dashboard_styles():
             filter:drop-shadow(0 8px 16px #0008);
         }
         .broadcast-art-fallback {
-            width:120px;
-            height:150px;
+            width:110px;
+            height:145px;
             display:grid;
             place-items:center;
             color:#f3ce7d;
             border:1px solid #b88b43;
             border-radius:12px;
             background:linear-gradient(145deg,#321921,#121824);
-            font-size:38px;
+            font-size:34px;
             font-weight:900;
         }
         .broadcast-score {
             background:linear-gradient(135deg,#1b202c,#10151e);
             border:1px solid #343a49;
             border-top:3px solid #d92640;
-            border-radius:11px;
-            padding:16px;
-            min-height:105px;
+            border-radius:10px;
+            padding:14px;
+            min-height:95px;
             box-sizing:border-box;
         }
         .broadcast-score-label {
@@ -207,26 +198,24 @@ def add_dashboard_styles():
             font-size:11px;
             font-weight:700;
             letter-spacing:1px;
-            margin-bottom:10px;
+            margin-bottom:9px;
         }
         .broadcast-score-value {
             color:white;
-            font-size:29px;
+            font-size:28px;
             line-height:1.15;
             font-weight:900;
         }
         .broadcast-next {
-            color:#ffffff;
             border-left:4px solid #ff334f;
-            padding:5px 0 5px 15px;
-            margin:5px 0;
+            padding:5px 0 5px 14px;
         }
         .broadcast-next strong {
             display:block;
             color:#ffb2be;
             font-size:12px;
             letter-spacing:2px;
-            margin-bottom:6px;
+            margin-bottom:5px;
         }
         .broadcast-next span {
             color:#d9dee7;
@@ -236,7 +225,7 @@ def add_dashboard_styles():
             display:grid;
             grid-template-columns:repeat(6,minmax(0,1fr));
             gap:8px;
-            margin:12px 0 8px;
+            margin:12px 0;
         }
         .broadcast-step {
             padding:13px 6px;
@@ -246,7 +235,6 @@ def add_dashboard_styles():
             border-radius:9px;
         }
         .broadcast-step-icon {
-            display:block;
             font-size:20px;
             margin-bottom:7px;
         }
@@ -275,25 +263,25 @@ def add_dashboard_styles():
         }
         @media(max-width:650px) {
             .broadcast-hero {
-                padding:20px;
+                padding:18px;
                 gap:12px;
-                min-height:235px;
+                min-height:215px;
             }
             .broadcast-art {
-                flex-basis:105px;
-                width:105px;
-                height:155px;
+                flex-basis:95px;
+                width:95px;
+                height:140px;
             }
             .broadcast-art-fallback {
-                width:90px;
-                height:120px;
-                font-size:28px;
+                width:85px;
+                height:115px;
+                font-size:27px;
             }
             .broadcast-stat {
-                min-width:48px;
-                padding:8px;
+                min-width:45px;
+                padding:7px;
             }
-            .broadcast-stat strong { font-size:21px; }
+            .broadcast-stat strong { font-size:20px; }
             .broadcast-tracker {
                 grid-template-columns:repeat(3,minmax(0,1fr));
             }
@@ -304,188 +292,315 @@ def add_dashboard_styles():
     )
 
 
-def show_featured_player(repo, fid, franchise, run, players):
+def show_featured(repo, fid, franchise, run, players):
     candidates = (
         weekly_mvp_candidates(repo, fid, run['id'])
         if run else []
     )
+    by_id = {player['id']: player for player in players}
     featured = candidates[0] if candidates else None
-    players_by_id = {player['id']: player for player in players}
-    player = (
-        players_by_id.get(featured['player_id'])
-        if featured else None
-    )
+    player = by_id.get(featured['player_id']) if featured else None
 
-    franchise_line = (
-        escape(franchise['name'])
-        + ' · '
-        + escape(franchise['event'])
-    )
-
-    if player:
-        totals = featured['totals']
-        if player['kind'] == 'hitter':
-            stats = [
-                (totals.get('hr', 0), 'HR'),
-                (totals.get('rbi', 0), 'RBI'),
-                (f"{totals.get('ops', 0):.3f}", 'OPS'),
-            ]
-        else:
-            stats = [
-                (totals.get('ip', '0.0'), 'IP'),
-                (totals.get('so', 0), 'K'),
-                (f"{totals.get('era', 0):.2f}", 'ERA'),
-            ]
-
-        stat_html = ''.join(
-            '<div class="broadcast-stat"><strong>'
-            + escape(value)
-            + '</strong><span>'
-            + escape(label)
-            + '</span></div>'
-            for value, label in stats
-        )
-
-        tied = [
-            candidate['name']
-            for candidate in candidates
-            if math.isclose(
-                candidate['score'],
-                featured['score'],
-                rel_tol=1e-9,
-                abs_tol=1e-9,
-            )
-        ]
-        note = (
-            f"Weekly MVP score: {featured['score']:.2f}"
-        )
-        if len(tied) > 1:
-            note += ' · Shared lead: ' + ', '.join(tied)
-        else:
-            note += ' · Leading the current week’s MVP score'
-        note += '. Final MVP selection remains yours.'
-
-        initials = ''.join(
-            word[0] for word in player['name'].split()[:2]
-        ).upper()
-        art = (
-            '<div class="broadcast-art-fallback">'
-            + escape(initials)
-            + '</div>'
-        )
-        url = player_art_url(player)
-        if url:
-            art += (
-                '<img src="' + escape(url) + '" alt="'
-                + escape(player['name']) + '" decoding="async" '
-                'onerror="this.style.display=\'none\'">'
-            )
-
-        body = (
+    if not player:
+        st.markdown(
             '<div class="broadcast-hero">'
             '<div class="broadcast-copy">'
-            '<div class="broadcast-franchise">'
-            + franchise_line
-            + '</div>'
-            '<div class="broadcast-eyebrow">'
-            'Player of the Week Watch</div>'
-            '<div class="broadcast-name">'
-            + escape(player['name'])
-            + '</div>'
-            '<div class="broadcast-stat-row">'
-            + stat_html
-            + '</div>'
-            '<div class="broadcast-note">'
-            + escape(note)
-            + '</div></div>'
-            '<div class="broadcast-art">'
-            + art
-            + '</div></div>'
-        )
-    else:
-        body = (
-            '<div class="broadcast-hero">'
-            '<div class="broadcast-copy">'
-            '<div class="broadcast-eyebrow">'
-            'Franchise Headquarters</div>'
+            '<div class="broadcast-eyebrow">Franchise Headquarters</div>'
             '<div class="broadcast-name">'
             + escape(franchise['name'])
-            + '</div>'
-            '<div class="broadcast-franchise">'
-            + escape(franchise['event'])
-            + '</div>'
-            '<div class="broadcast-note">'
-            'Your featured player will appear once this week '
-            'has qualifying saved stats.'
-            '</div></div></div>'
+            + '</div><div class="broadcast-note">'
+            'Your featured player appears after qualifying '
+            'stats are saved for this week.'
+            '</div></div></div>',
+            unsafe_allow_html=True,
         )
+        return
 
-    st.markdown(body, unsafe_allow_html=True)
-
-
-def show_next_action(franchise, run):
-    state = franchise['state']
-
-    if state == State.ACTIVE:
-        remaining = max(run['max_losses'] - run['losses'], 0)
-        detail = (
-            'Week in progress · '
-            + str(remaining)
-            + (' loss remaining' if remaining == 1 else ' losses remaining')
-        )
-        label = '⚾ ENTER NEXT GAME'
-        page = 'pages/3_Game_Entry.py'
-    elif state == State.WHEEL:
-        detail = 'A required wheel is waiting for you.'
-        label = '🎡 OPEN WHEEL ROOM'
-        page = 'pages/4_Wheel_Room.py'
-    elif state in [State.SETUP, State.READY]:
-        detail = 'Review your roster, then start the next week.'
-        label = '⚾ REVIEW ROSTER'
-        page = 'pages/2_Roster_Manager.py'
+    totals = featured['totals']
+    if player['kind'] == 'hitter':
+        stats = [
+            (totals.get('hr', 0), 'HR'),
+            (totals.get('rbi', 0), 'RBI'),
+            (f"{totals.get('ops', 0):.3f}", 'OPS'),
+        ]
     else:
-        detail = 'Continue your between-week offseason.'
-        label = '➡️ CONTINUE OFFSEASON'
-        page = 'pages/6_Offseason.py'
+        stats = [
+            (totals.get('ip', '0.0'), 'IP'),
+            (totals.get('so', 0), 'K'),
+            (f"{totals.get('era', 0):.2f}", 'ERA'),
+        ]
 
-    with st.container(border=True):
-        copy_column, button_column = st.columns([2, 1])
-        with copy_column:
-            st.markdown(
-                '<div class="broadcast-next">'
-                '<strong>NEXT UP</strong><span>'
-                + escape(detail)
-                + '</span></div>',
-                unsafe_allow_html=True,
-            )
-        with button_column:
-            if st.button(
-                label,
-                type='primary',
-                use_container_width=True,
-                key='dashboard_next:' + franchise['id'],
-            ):
-                st.switch_page(page)
+    stat_html = ''.join(
+        '<div class="broadcast-stat"><strong>'
+        + escape(value)
+        + '</strong><span>' + escape(label)
+        + '</span></div>'
+        for value, label in stats
+    )
+    tied = [
+        candidate['name']
+        for candidate in candidates
+        if math.isclose(
+            candidate['score'], featured['score'],
+            rel_tol=1e-9, abs_tol=1e-9,
+        )
+    ]
+    note = f"Weekly MVP score: {featured['score']:.2f}"
+    if len(tied) > 1:
+        note += ' · Shared lead: ' + ', '.join(tied)
+    else:
+        note += ' · Current score leader'
+    note += ' · Final selection is yours.'
 
-    if state in [State.SETUP, State.READY]:
-        if st.button(
-            'Validate and start next week',
-            key='dashboard_start:' + franchise['id'],
-        ):
-            start_run(franchise_repo_placeholder, franchise['id'])
+    initials = ''.join(
+        word[0] for word in player['name'].split()[:2]
+    ).upper()
+    art = (
+        '<div class="broadcast-art-fallback">'
+        + escape(initials) + '</div>'
+    )
+    url = player_art_url(player)
+    if url:
+        art += (
+            '<img src="' + escape(url) + '" alt="'
+            + escape(player['name'])
+            + '" decoding="async" '
+            'onerror="this.style.display=\'none\'">'
+        )
+
+    st.markdown(
+        '<div class="broadcast-hero">'
+        '<div class="broadcast-copy">'
+        '<div class="broadcast-eyebrow">Player of the Week Watch</div>'
+        '<div class="broadcast-name">'
+        + escape(player['name'])
+        + '</div><div class="broadcast-stat-row">'
+        + stat_html
+        + '</div><div class="broadcast-note">'
+        + escape(note)
+        + '</div></div><div class="broadcast-art">'
+        + art + '</div></div>',
+        unsafe_allow_html=True,
+    )
 
 
-def show_offseason_tracker(repo, fid, franchise, run):
+def leader_totals(rows, run_id=None):
+    totals = {}
+    for row in rows:
+        if run_id is not None and row.get('run_id') != run_id:
+            continue
+        counters = totals.setdefault(
+            row['player_id'], {'hr': 0, 'rbi': 0, 'so': 0}
+        )
+        for field in counters:
+            counters[field] += row.get('line', {}).get(field, 0)
+    return totals
+
+
+def show_leaders(players, totals, empty_message):
+    categories = [
+        ('hitter', 'hr', 'Home runs', 'HR'),
+        ('hitter', 'rbi', 'Runs batted in', 'RBI'),
+        ('pitcher', 'so', 'Strikeouts', 'K'),
+    ]
+
+    for column, (kind, field, title, unit) in zip(
+        st.columns(3), categories
+    ):
+        # Only disambiguate cards that actually appear in this category.
+        candidates = [
+            player for player in players
+            if player['kind'] == kind
+            and totals.get(player['id'], {}).get(field, 0) > 0
+        ]
+        counts = {}
+        for player in candidates:
+            key = name_key(player['name'])
+            counts[key] = counts.get(key, 0) + 1
+
+        grouped = {}
+        for player in candidates:
+            label = player['name']
+            if counts[name_key(label)] > 1:
+                label += (
+                    f" ({player['ovr']} OVR · "
+                    + str(player.get('series') or player.get('version') or 'Card')
+                    + ')'
+                )
+            value = totals[player['id']][field]
+            grouped.setdefault(value, []).append(label)
+
+        values = sorted(grouped, reverse=True)[:3]
+        with column:
+            with st.container(border=True):
+                if not values:
+                    st.metric(title, 0)
+                    st.caption(empty_message)
+                    continue
+
+                st.metric(title, values[0])
+                names = sorted(grouped[values[0]], key=str.casefold)
+                st.write(' · '.join(names))
+                if len(names) > 1:
+                    st.caption('Tied for first')
+
+                if len(values) > 1:
+                    st.divider()
+                for place, value in enumerate(values[1:], start=2):
+                    medal = '🥈' if place == 2 else '🥉'
+                    names = sorted(grouped[value], key=str.casefold)
+                    rank = f'Tied {place}' if len(names) > 1 else str(place)
+                    st.caption(
+                        f'{medal} {rank} · '
+                        + ', '.join(names)
+                        + f' — {value:g} {unit}'
+                    )
+
+
+def challenge_progress(repo, fid, challenge):
+    if (
+        challenge['status'] == 'waiting_next_run'
+        or not challenge.get('metric')
+    ):
+        return None
+
+    player = repo.get('players', challenge['player_id'])
+    if not player:
+        return None
+
+    rid = challenge['run_id']
+    game_id = None
+    if challenge.get('scope') == 'next_game':
+        games = repo.list('games', fid, rid)
+        source = (
+            repo.get('games', challenge['source_game'])
+            if challenge.get('source_game') else None
+        )
+        games = [
+            game for game in games
+            if not source or game['number'] > source['number']
+        ]
+        if not games:
+            return 0
+        game_id = min(games, key=lambda game: game['number'])['id']
+
+    totals = aggregate(repo, fid, player, rid, game_id)
+    metric = challenge['metric']
+
+    if metric == 'extra_base_hits':
+        return sum(
+            totals.get(field, 0)
+            for field in ['doubles', 'triples', 'hr']
+        )
+    if metric == 'times_on_base':
+        return sum(
+            totals.get(field, 0)
+            for field in ['h', 'bb', 'hbp']
+        )
+    return totals.get(metric, 0)
+
+
+def show_challenges(repo, fid, run):
+    challenges = [
+        challenge
+        for challenge in repo.list('challenges', fid)
+        if challenge['status'] in [
+            'active', 'awaiting_manual', 'waiting_next_run'
+        ]
+        or (
+            run and challenge['run_id'] == run['id']
+            and challenge['status'] in ['passed', 'failed']
+        )
+    ]
+
+    st.markdown('### 🌱 Development & challenges')
+    if not challenges:
+        st.caption('No challenges to track right now.')
+        return
+
+    labels = {
+        'h': 'hits', 'hr': 'home runs', 'rbi': 'RBI',
+        'so': 'strikeouts', 'outs': 'outs recorded',
+        'w': 'wins', 'sv': 'saves',
+        'extra_base_hits': 'extra-base hits',
+        'times_on_base': 'times on base',
+    }
+    statuses = {
+        'active': 'In progress',
+        'passed': 'Completed',
+        'failed': 'Not achieved',
+        'awaiting_manual': 'Needs confirmation',
+        'waiting_next_run': 'Starts next week',
+    }
+    columns = st.columns(2)
+
+    for index, challenge in enumerate(challenges):
+        player = repo.get('players', challenge['player_id'])
+        status = challenge['status']
+        total = challenge_progress(repo, fid, challenge)
+        goal = challenge.get('threshold', 1)
+        unit = labels.get(
+            challenge.get('metric'), challenge.get('metric', '')
+        )
+
+        with columns[index % 2]:
+            with st.container(border=True):
+                st.markdown(
+                    '**' + (player['name'] if player else 'Player unavailable')
+                    + '**'
+                )
+                if total is not None:
+                    st.write(f'{total:g} / {goal:g} {unit}')
+                    st.progress(
+                        min(max(float(total) / goal, 0.0), 1.0)
+                        if goal > 0 else 1.0
+                    )
+                st.caption(statuses.get(status, status))
+
+                with st.expander('Goal & details'):
+                    st.write(challenge['description'])
+                    if status == 'waiting_next_run':
+                        st.caption(
+                            'Current-week stats do not count.'
+                        )
+                    else:
+                        entry = repo.get('runs', challenge['run_id'])
+                        week = (
+                            entry.get('week_number', entry['number'])
+                            if entry else '?'
+                        )
+                        scope = (
+                            'Next qualifying game only'
+                            if challenge.get('scope') == 'next_game'
+                            else 'Entire week'
+                        )
+                        st.caption(f'Week {week} · {scope}')
+
+                    reward = {
+                        'tag': 'Franchise Tag',
+                        'upgrade': 'Next available same-player card upgrade',
+                    }.get(challenge.get('reward'), 'Player protection')
+                    st.caption('Reward: ' + reward)
+
+                    if (
+                        status in ['active', 'awaiting_manual']
+                        and not challenge.get('metric')
+                    ):
+                        st.caption(
+                            'Requires evidence and offseason confirmation.'
+                        )
+
+    st.caption('Progress uses saved game stats only.')
+
+
+def show_tracker(repo, fid, franchise, run):
     steps = [
-        ('🏆', 'MVP'),
-        ('🎡', 'Wheels'),
-        ('❄️', 'Cold Bat'),
-        ('📦', 'Moves'),
-        ('⚾', 'Rebuild'),
-        ('🛡️', 'Validate'),
+        ('🏆', 'MVP'), ('🎡', 'Wheels'), ('❄️', 'Cold Bat'),
+        ('📦', 'Moves'), ('⚾', 'Rebuild'), ('🛡️', 'Validate'),
     ]
     state = franchise['state']
     current = None
+    complete = False
 
     if run and run.get('ended_at'):
         if state in [State.ENDED, State.MVP]:
@@ -494,13 +609,12 @@ def show_offseason_tracker(repo, fid, franchise, run):
             current = 1
         elif state == State.WHEEL:
             job = (
-                franchise.get('queue', [])[0]
+                franchise['queue'][0]
                 if franchise.get('queue') else {}
             )
-            wheel_id = job.get('wheel_id')
-            if wheel_id == 'mvp':
+            if job.get('wheel_id') == 'mvp':
                 current = 0
-            elif wheel_id == 'cold_bat':
+            elif job.get('wheel_id') == 'cold_bat':
                 current = 2
             elif run.get('cold_bat_decision'):
                 current = 3
@@ -519,19 +633,16 @@ def show_offseason_tracker(repo, fid, franchise, run):
             current = 4
         elif state == State.VALIDATION:
             current = 5
-
-    st.subheader('Between-week tracker')
-
-    if current is None:
-        if state == State.READY and run and run.get('ended_at'):
-            st.caption('Offseason complete · Ready for the next week.')
+        elif state == State.READY:
             complete = True
-        else:
-            st.caption('Unlocks when this week ends.')
-            complete = False
+
+    st.markdown('### Between-week tracker')
+    if complete:
+        st.caption('Offseason complete · Ready for the next week.')
+    elif current is None:
+        st.caption('Unlocks when this week ends.')
     else:
-        st.caption('Your current offseason stage is highlighted.')
-        complete = False
+        st.caption('Your current stage is highlighted.')
 
     cells = []
     for index, (icon, name) in enumerate(steps):
@@ -544,329 +655,101 @@ def show_offseason_tracker(repo, fid, franchise, run):
 
         cells.append(
             '<div class="broadcast-step ' + style + '">'
-            '<span class="broadcast-step-icon">'
-            + icon
-            + '</span><div class="broadcast-step-name">'
-            + name
-            + '</div><div class="broadcast-step-status">'
-            + status
+            '<div class="broadcast-step-icon">' + icon
+            + '</div><div class="broadcast-step-name">' + name
+            + '</div><div class="broadcast-step-status">' + status
             + '</div></div>'
         )
 
     st.markdown(
         '<div class="broadcast-tracker">'
-        + ''.join(cells)
-        + '</div>',
+        + ''.join(cells) + '</div>',
         unsafe_allow_html=True,
     )
 
 
-def challenge_progress(repo, fid, challenge):
-    if (
-        challenge['status'] == 'waiting_next_run'
-        or not challenge.get('metric')
-    ):
-        return None
-
-    player = repo.get('players', challenge['player_id'])
-    if not player:
-        return None
-
-    rid = challenge['run_id']
-    game_id = None
-
-    if challenge.get('scope') == 'next_game':
-        games = repo.list('games', fid, rid)
-        source = (
-            repo.get('games', challenge['source_game'])
-            if challenge.get('source_game') else None
-        )
-        games = [
-            game for game in games
-            if not source or game['number'] > source['number']
-        ]
-        if not games:
-            return 0
-        game_id = min(
-            games, key=lambda game: game['number']
-        )['id']
-
-    return aggregate(
-        repo, fid, player, rid, game_id
-    ).get(challenge['metric'], 0)
-
-
-def show_challenges(repo, fid, run):
-    st.subheader('Challenge progress')
-    st.caption(
-        'Progress updates from saved game stats. '
-        'Unsaved drafts are not included.'
-    )
-    challenges = [
-        challenge
-        for challenge in repo.list('challenges', fid)
-        if challenge['status'] in [
-            'active', 'awaiting_manual', 'waiting_next_run'
-        ]
-        or (
-            run
-            and challenge['run_id'] == run['id']
-            and challenge['status'] in ['passed', 'failed']
-        )
-    ]
-    if not challenges:
-        st.info('No challenges to track right now.')
+def edit_game_details(repo, fid, games):
+    if not games:
+        st.caption('No saved games yet.')
         return
 
-    labels = {
-        'h': 'hits', 'hr': 'HR', 'rbi': 'RBI',
-        'so': 'strikeouts', 'outs': 'outs recorded',
-        'w': 'wins', 'sv': 'saves',
+    runs = {
+        entry['id']: entry for entry in repo.list('runs', fid)
     }
-    statuses = {
-        'active': 'In progress',
-        'passed': 'Completed',
-        'failed': 'Not achieved',
-        'awaiting_manual': 'Needs confirmation',
-        'waiting_next_run': 'Starts next week',
+    seasons = {
+        season['id']: season for season in repo.list('seasons', fid)
     }
-
-    for challenge in challenges:
-        player = repo.get('players', challenge['player_id'])
-        with st.container(border=True):
-            st.subheader(
-                player['name'] if player else 'Player unavailable'
-            )
-            st.write(challenge['description'])
-            status = challenge['status']
-            total = challenge_progress(repo, fid, challenge)
-
-            if total is not None:
-                goal = challenge.get('threshold', 1)
-                unit = labels.get(
-                    challenge['metric'], challenge['metric']
-                )
-                st.write(
-                    f"**{total:g} / {goal:g} {unit}** · "
-                    + statuses.get(status, status)
-                )
-                st.progress(
-                    min(max(float(total) / goal, 0.0), 1.0)
-                    if goal > 0 else 1.0
-                )
-                if status == 'active':
-                    remaining = max(goal - total, 0)
-                    st.caption(
-                        f'{remaining:g} more {unit} needed.'
-                        if remaining else
-                        'Goal reached in saved stats; check challenge status.'
-                    )
-            else:
-                st.write(statuses.get(status, status))
-                if (
-                    status in ['active', 'awaiting_manual']
-                    and not challenge.get('metric')
-                ):
-                    st.caption(
-                        'Provide evidence and confirm during offseason.'
-                    )
-
-            if status == 'waiting_next_run':
-                st.caption(
-                    'Current-week stats do not count toward this challenge.'
-                )
-            else:
-                entry = repo.get('runs', challenge['run_id'])
-                week = (
-                    entry.get('week_number', entry['number'])
-                    if entry else '?'
-                )
-                scope = (
-                    'next qualifying game only'
-                    if challenge.get('scope') == 'next_game'
-                    else 'whole week'
-                )
-                st.caption(f'Week {week} · {scope}')
-
-            reward = {
-                'tag': 'Franchise Tag',
-                'upgrade': 'Next available same-player card upgrade',
-            }.get(challenge.get('reward'), 'Player protection')
-            st.caption('Reward: ' + reward)
-
-            move = repo.get('moves', 'challenge:' + challenge['id'])
-            if status == 'passed' and move and move['status'] == 'pending':
-                st.info(
-                    'Resolve this earned reward in Banked Moves '
-                    'during offseason.'
-                )
-
-
-def leader_totals(stat_rows, run_id=None):
-    totals = {}
-    for row in stat_rows:
-        if run_id is not None and row.get('run_id') != run_id:
-            continue
-        counters = totals.setdefault(
-            row['player_id'], {'hr': 0, 'rbi': 0, 'so': 0}
+    labels = {}
+    for game in games:
+        entry = runs.get(game['run_id'])
+        week = (
+            entry.get('week_number', entry['number'])
+            if entry else '?'
         )
-        for field in counters:
-            counters[field] += row.get('line', {}).get(field, 0)
-    return totals
-
-
-def show_leader_cards(players, totals, empty_message):
-    categories = [
-        ('hitter', 'hr', 'Home runs', 'HR'),
-        ('hitter', 'rbi', 'Runs batted in', 'RBI'),
-        ('pitcher', 'so', 'Strikeouts', 'K'),
-    ]
-    name_counts = {}
-    for player in players:
-        name = player['name'].strip().casefold()
-        name_counts[name] = name_counts.get(name, 0) + 1
-
-    def label(player):
-        name = player['name']
-        if name_counts[name.strip().casefold()] > 1:
-            card = player.get('series') or player.get('version') or 'Card'
-            return f"{name} ({player['ovr']} OVR · {card})"
-        return name
-
-    for column, (kind, field, title, unit) in zip(
-        st.columns(3), categories
-    ):
-        grouped = {}
-        for player in players:
-            if player['kind'] != kind:
-                continue
-            value = totals.get(player['id'], {}).get(field, 0)
-            if value > 0:
-                grouped.setdefault(value, []).append(label(player))
-
-        values = sorted(grouped, reverse=True)[:3]
-        with column:
-            with st.container(border=True):
-                if not values:
-                    st.metric(title, 0)
-                    st.caption(empty_message)
-                    continue
-
-                best = values[0]
-                leaders = sorted(grouped[best], key=str.casefold)
-                st.markdown(
-                    '<div class="broadcast-eyebrow">🏆 '
-                    + escape(title)
-                    + '</div>',
-                    unsafe_allow_html=True,
-                )
-                st.metric('First place', best, label_visibility='collapsed')
-                st.write(' · '.join(leaders))
-                if len(leaders) > 1:
-                    st.caption('Tied for first')
-
-                if len(values) > 1:
-                    st.divider()
-                for place, value in enumerate(values[1:], start=2):
-                    medal = '🥈' if place == 2 else '🥉'
-                    names = sorted(grouped[value], key=str.casefold)
-                    rank = f'Tied {place}' if len(names) > 1 else str(place)
-                    st.caption(
-                        f'{medal} {rank} · '
-                        + ', '.join(names)
-                        + f' — {value:g} {unit}'
-                    )
-
-
-def edit_game_details(repo, fid, games):
-    with st.expander('Edit saved game details'):
-        if not games:
-            st.info('No saved games yet.')
-            return
-
-        runs = {
-            entry['id']: entry
-            for entry in repo.list('runs', fid)
-        }
-        seasons = {
-            season['id']: season
-            for season in repo.list('seasons', fid)
-        }
-        labels = {}
-        for game in games:
-            entry = runs.get(game['run_id'])
-            week = (
-                entry.get('week_number', entry['number'])
-                if entry else '?'
-            )
-            season = (
-                seasons.get(entry.get('season_id'))
-                if entry else None
-            )
-            prefix = f"Season {season['number']} · " if season else ''
-            labels[game['id']] = (
-                prefix + f"Week {week} · Game {game['number']} "
-                + f"· {game['result']}"
-            )
-
-        gid = st.selectbox(
-            'Choose a saved game',
-            list(labels),
-            format_func=labels.get,
-            key='game_details_target:' + fid,
+        season = (
+            seasons.get(entry.get('season_id'))
+            if entry else None
         )
-        selected = repo.get('games', gid)
+        prefix = f"Season {season['number']} · " if season else ''
+        labels[game['id']] = (
+            prefix + f"Week {week} · Game {game['number']} "
+            + f"· {game['result']}"
+        )
 
-        with st.form('game_details:' + gid):
-            opponent = st.text_input(
-                'Opponent name', value=selected.get('opponent') or ''
-            )
-            include = st.checkbox(
-                'Include scores',
-                value=selected.get('team_score') is not None,
-            )
-            a, b = st.columns(2)
-            own = a.number_input(
-                'Your score', min_value=0,
-                value=int(selected.get('team_score') or 0),
-            )
-            opp = b.number_input(
-                'Opponent score', min_value=0,
-                value=int(selected.get('opponent_score') or 0),
-            )
-            notes = st.text_area(
-                'Game notes', value=selected.get('notes') or ''
-            )
+    gid = st.selectbox(
+        'Choose a saved game', list(labels), format_func=labels.get,
+        key='game_details_target:' + fid,
+    )
+    selected = repo.get('games', gid)
 
-            if st.form_submit_button('Save game details'):
-                with repo.transaction():
-                    current = repo.get('games', gid)
-                    valid = (
-                        not include
-                        or (
-                            own != opp
-                            and (own > opp) == (current['result'] == 'W')
-                        )
+    with st.form('game_details:' + gid):
+        opponent = st.text_input(
+            'Opponent name', value=selected.get('opponent') or ''
+        )
+        include = st.checkbox(
+            'Include scores',
+            value=selected.get('team_score') is not None,
+        )
+        a, b = st.columns(2)
+        own = a.number_input(
+            'Your score', min_value=0,
+            value=int(selected.get('team_score') or 0),
+        )
+        opp = b.number_input(
+            'Opponent score', min_value=0,
+            value=int(selected.get('opponent_score') or 0),
+        )
+        notes = st.text_area(
+            'Game notes', value=selected.get('notes') or ''
+        )
+        if st.form_submit_button('Save game details'):
+            with repo.transaction():
+                current = repo.get('games', gid)
+                valid = (
+                    not include
+                    or (
+                        own != opp
+                        and (own > opp) == (current['result'] == 'W')
                     )
-                    if not valid:
-                        st.error('Scores must match the saved W/L result.')
-                    else:
-                        before = dict(current)
-                        current.update(
-                            opponent=opponent.strip(),
-                            team_score=int(own) if include else None,
-                            opponent_score=int(opp) if include else None,
-                            notes=notes,
-                        )
-                        repo.put('games', current)
-                        audit(
-                            repo, fid, 'edit_game_details',
-                            before, current,
-                            'Update opponent, scores, or game notes',
-                            current['run_id'],
-                        )
-                if valid:
-                    st.rerun()
+                )
+                if not valid:
+                    st.error('Scores must match the saved W/L result.')
+                else:
+                    before = dict(current)
+                    current.update(
+                        opponent=opponent.strip(),
+                        team_score=int(own) if include else None,
+                        opponent_score=int(opp) if include else None,
+                        notes=notes,
+                    )
+                    repo.put('games', current)
+                    audit(
+                        repo, fid, 'edit_game_details', before, current,
+                        'Update opponent, scores, or game notes',
+                        current['run_id'],
+                    )
+            if valid:
+                st.rerun()
 
 
 def render(repo, f):
@@ -884,14 +767,13 @@ def render(repo, f):
     ]
     cfg = settings(repo, fid)
 
-    add_dashboard_styles()
-    show_featured_player(repo, fid, f, run, players)
+    add_styles()
+    show_featured(repo, fid, f, run, players)
 
     threshold = next(
         (
-            number for number in sorted(
-                int(key) for key in cfg['milestones']
-            )
+            number
+            for number in sorted(int(key) for key in cfg['milestones'])
             if not run or number > run['wins']
         ),
         None,
@@ -919,18 +801,11 @@ def render(repo, f):
                 '<div class="broadcast-score-label">'
                 + escape(label)
                 + '</div><div class="broadcast-score-value">'
-                + escape(value)
-                + '</div></div>',
+                + escape(value) + '</div></div>',
                 unsafe_allow_html=True,
             )
 
     st.write('')
-    if run:
-        week = run.get('week_number', run['number'])
-        st.caption(f'Week {week} · {f["event"]}')
-
-    # Render the next-action panel directly so the start action
-    # uses this page's actual repository.
     state = f['state']
     if state == State.ACTIVE and run:
         remaining = max(run['max_losses'] - run['losses'], 0)
@@ -938,16 +813,16 @@ def render(repo, f):
             f'Week in progress · {remaining} '
             + ('loss remaining' if remaining == 1 else 'losses remaining')
         )
-        button_label, page = '⚾ ENTER NEXT GAME', 'pages/3_Game_Entry.py'
+        label, page = '⚾ ENTER NEXT GAME', 'pages/3_Game_Entry.py'
     elif state == State.WHEEL:
         detail = 'A required wheel is waiting for you.'
-        button_label, page = '🎡 OPEN WHEEL ROOM', 'pages/4_Wheel_Room.py'
+        label, page = '🎡 OPEN WHEEL ROOM', 'pages/4_Wheel_Room.py'
     elif state in [State.SETUP, State.READY]:
         detail = 'Review your roster, then start the next week.'
-        button_label, page = '⚾ REVIEW ROSTER', 'pages/2_Roster_Manager.py'
+        label, page = '⚾ REVIEW ROSTER', 'pages/2_Roster_Manager.py'
     else:
         detail = 'Continue your between-week offseason.'
-        button_label, page = '➡️ CONTINUE OFFSEASON', 'pages/6_Offseason.py'
+        label, page = '➡️ CONTINUE OFFSEASON', 'pages/6_Offseason.py'
 
     with st.container(border=True):
         a, b = st.columns([2, 1])
@@ -955,15 +830,12 @@ def render(repo, f):
             st.markdown(
                 '<div class="broadcast-next">'
                 '<strong>NEXT UP</strong><span>'
-                + escape(detail)
-                + '</span></div>',
+                + escape(detail) + '</span></div>',
                 unsafe_allow_html=True,
             )
         with b:
             if st.button(
-                button_label,
-                type='primary',
-                use_container_width=True,
+                label, type='primary', use_container_width=True,
                 key='dashboard_next:' + fid,
             ):
                 st.switch_page(page)
@@ -990,91 +862,129 @@ def render(repo, f):
             if game['result'] != last:
                 break
             streak += 1
-        if last == 'W':
-            st.success(f'🔥 On a roll: {streak}-game winning streak')
-        else:
-            st.info(f'⚾ Time to bounce back: {streak}-game losing streak')
+
+        streak_text = (
+            f'🔥 {streak}-game winning streak'
+            if last == 'W'
+            else f'⚾ {streak}-game losing streak'
+        )
+        if run and threshold:
+            remaining = threshold - run['wins']
+            streak_text += (
+                f" · {remaining} more "
+                f"{'win' if remaining == 1 else 'wins'} "
+                'until the next milestone'
+            )
+        st.caption(streak_text)
 
     if run and threshold:
-        remaining = threshold - run['wins']
-        st.caption(
-            f"🎡 {remaining} more "
-            f"{'win' if remaining == 1 else 'wins'} "
-            'until your next milestone wheel'
-        )
         st.progress(min(max(run['wins'] / threshold, 0.0), 1.0))
 
     stats = repo.list('stats', fid)
     st.subheader('Clubhouse Leaders')
-    st.caption(
-        'Current-week stats · Top three distinct positive totals. '
-        'Tied players share a place.'
-    )
+    st.caption('This week · Tied players share a place.')
     if run:
-        show_leader_cards(
+        show_leaders(
             players, leader_totals(stats, run['id']),
             'Waiting for the first mark',
         )
     else:
         st.caption('Start a week to see your clubhouse leaders.')
 
-    show_offseason_tracker(repo, fid, f, run)
+    week_tab, offseason_tab, franchise_tab, manage_tab = st.tabs([
+        '⚾ This Week',
+        '🎡 Offseason',
+        '🏆 Franchise',
+        '✏️ Manage',
+    ])
 
-    with st.expander('🏆 All-Time Franchise Leaders', expanded=True):
+    with week_tab:
+        show_challenges(repo, fid, run)
+
+        st.markdown('### Recent games')
+        recent = list(reversed(run_games))[:5]
+        if not recent:
+            st.caption('Your first saved game will appear here.')
+        else:
+            table([
+                {
+                    'Game': game['number'],
+                    'Result': 'Win' if game['result'] == 'W' else 'Loss',
+                    'Score': (
+                        f"{game['team_score']}–{game['opponent_score']}"
+                        if game.get('team_score') is not None
+                        and game.get('opponent_score') is not None
+                        else 'Not recorded'
+                    ),
+                    'Opponent': game.get('opponent') or '—',
+                }
+                for game in recent
+            ])
+            noted = [game for game in recent if game.get('notes')]
+            if noted:
+                with st.expander('Recent game notes'):
+                    for game in noted:
+                        st.markdown(f"**Game {game['number']}**")
+                        st.write(game['notes'])
+
+    with offseason_tab:
+        show_tracker(repo, fid, f, run)
+        if state not in [State.ACTIVE, State.SETUP, State.READY]:
+            navigate('Continue offseason', 'Offseason')
+
+        st.markdown('### 📦 Banked moves')
+        if pending:
+            table([
+                {
+                    'Move': move['description'],
+                    'Action': move['type'].replace('_', ' ').title(),
+                    'Status': (
+                        'Saved for later'
+                        if move['status'] == 'deferred'
+                        else 'Waiting for offseason'
+                    ),
+                }
+                for move in pending
+            ])
+            navigate('Open Banked Moves', 'Banked Moves')
+        else:
+            st.caption('No banked moves waiting.')
+
+        spins = repo.list('spins', fid)
+        if spins:
+            st.caption('Latest wheel: ' + spins[-1]['result']['text'])
+
+    with franchise_tab:
+        st.markdown('### 🏆 All-Time Franchise Leaders')
         st.caption(
             'Saved stats across every week and season, '
             'including former players.'
         )
-        show_leader_cards(
+        show_leaders(
             players, leader_totals(stats), 'No saved stats yet'
         )
 
-    st.subheader('Franchise status')
-    status_rows = []
-    for player in players:
-        status = badges(repo, fid, player)
-        if status:
-            status_rows.append({
-                'Player': player['name'], 'Status': status
-            })
-    table(status_rows)
+        with st.expander('Player status & reserve pool'):
+            rows = []
+            for player in players:
+                status = badges(repo, fid, player)
+                if status:
+                    rows.append({
+                        'Player': player['name'],
+                        'OVR': player['ovr'],
+                        'Status': status,
+                    })
+            table(rows)
+            navigate('Open Roster Manager', 'Roster Manager')
 
-    show_challenges(repo, fid, run)
+    with manage_tab:
+        st.markdown('### Edit saved game details')
+        st.caption(
+            'Update opponent names, scores, and notes. '
+            'Changes are saved with an audit record.'
+        )
+        edit_game_details(repo, fid, games)
 
-    st.subheader('From the dugout')
-    recent = list(reversed(run_games))[:5]
-    if not recent:
-        st.caption('Your first saved game will appear here.')
-
-    for game in recent:
-        with st.container(border=True):
-            outcome = 'WIN' if game['result'] == 'W' else 'LOSS'
-            score = ''
-            if (
-                game.get('team_score') is not None
-                and game.get('opponent_score') is not None
-            ):
-                score = (
-                    f" · {game['team_score']}–{game['opponent_score']}"
-                )
-            st.write(f"Game {game['number']} · {outcome}{score}")
-            if game.get('opponent'):
-                st.caption('Opponent: ' + game['opponent'])
-            if game.get('notes'):
-                st.write(game['notes'])
-
-    edit_game_details(repo, fid, games)
-
-    st.subheader('📦 Next Week Moves')
-    table([
-        {
-            'Move': move['description'],
-            'Type': move['type'],
-            'Status': move['status'],
-        }
-        for move in pending[:8]
-    ])
-
-    spins = repo.list('spins', fid)
-    if spins:
-        st.info('Latest wheel: ' + spins[-1]['result']['text'])
+        st.markdown('### Other tools')
+        navigate('Game and stat corrections / backups', 'Settings')
+        navigate('Manage roster', 'Roster Manager')
