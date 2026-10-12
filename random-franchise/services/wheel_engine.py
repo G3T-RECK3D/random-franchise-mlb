@@ -9,6 +9,15 @@ from services.challenge_service import create
 from services.reunion_service import reunion_pool
 
 
+COLD_BAT_EFFECTS = {
+    'cold_bat_hot_seat',
+    'cold_bat_order',
+    'cold_bat_bench',
+    'downgrade',
+}
+FIXED_REWARD_EFFECTS = COLD_BAT_EFFECTS | {'mvp_upgrade'}
+
+
 def trade_position_options(kind):
     if kind == 'hitter':
         groups = {
@@ -45,7 +54,7 @@ def trade_position_options(kind):
             active=True,
             effect='trade_position',
             positions=positions,
-            description='Incoming card primary position: '
+            description='Incoming card primary or secondary position: '
                         + ', '.join(positions),
         )
         for index, (label, positions) in enumerate(groups.items())
@@ -134,6 +143,14 @@ def _targets(repo, fid, wedge):
 
     pool = target_pool(repo, fid, eligibility.get('kind'))
 
+    if wedge.get('effect') == 'mvp_upgrade':
+        pool = [
+            player for player in repo.list('players', fid)
+            if player['area'] in [
+                'lineup', 'bench', 'rotation', 'bullpen',
+            ]
+        ]
+
     if wedge.get('effect') in [
         'hot_seat', 'protect', 'challenge', 'arrangement',
     ]:
@@ -189,13 +206,39 @@ def _performance(repo, fid, player):
     )
 
 
+def _fixed_reward_target(repo, fid, wedge, job):
+    target = (
+        repo.get('players', job['target'])
+        if job.get('target') else None
+    )
+    if not target or target['franchise_id'] != fid:
+        return None
+
+    if wedge.get('effect') == 'mvp_upgrade':
+        if target['area'] not in [
+            'lineup', 'bench', 'rotation', 'bullpen',
+        ]:
+            return None
+
+    elif wedge.get('effect') in COLD_BAT_EFFECTS:
+        if (
+            target['kind'] != 'hitter'
+            or target['area'] not in ['lineup', 'bench']
+            or protected(repo, fid, target)
+        ):
+            return None
+
+    return target
+
+
 def available(repo, fid, job):
     if job['wheel_id'] == 'trade_market':
         return trade_market_options()
 
     if job['wheel_id'] == 'trade_position':
-        kind = job.get('trade_context', {}).get('kind')
-        return trade_position_options(kind)
+        return trade_position_options(
+            job.get('trade_context', {}).get('kind')
+        )
 
     wheel = repo.get('wheels', f"{fid}:{job['wheel_id']}")
     if not wheel:
@@ -249,6 +292,15 @@ def available(repo, fid, job):
 
         eligibility = wedge.get('eligibility', {})
 
+        if wedge.get('effect') in FIXED_REWARD_EFFECTS:
+            target = _fixed_reward_target(repo, fid, wedge, job)
+            if (
+                not target
+                or wedge.get('follow_up')
+                or wedge.get('quantity', 1) != 1
+            ):
+                continue
+
         if wedge.get('effect') == 'reunion':
             if (
                 wedge.get('quantity', 1) != 1
@@ -286,9 +338,11 @@ def available(repo, fid, job):
 
 
 def _choose_target(repo, fid, wedge, job):
+    if wedge.get('effect') in FIXED_REWARD_EFFECTS:
+        return _fixed_reward_target(repo, fid, wedge, job)
+
     pool = _targets(repo, fid, wedge)
 
-    # Reunion chooses from former cards, never an inherited active target.
     if wedge.get('effect') == 'reunion':
         return random.SystemRandom().choice(pool) if pool else None
 
@@ -348,6 +402,26 @@ def _bank(repo, fid, job, saved_spin, wedge, target):
     }
     description = wedge['text']
 
+    if kind in FIXED_REWARD_EFFECTS:
+        if not target or target['franchise_id'] != fid:
+            raise RuleError('The selected player is unavailable.')
+
+        constraints['fixed_target'] = True
+        constraints['original_ovr'] = target['ovr']
+        description += ' · ' + target['name']
+
+        if kind == 'mvp_upgrade':
+            kind = 'upgrade'
+            constraints.update(
+                fallback='protection',
+                next_card_required=True,
+            )
+        elif kind == 'downgrade':
+            constraints.update(
+                fallback='hot_seat',
+                next_card_required=True,
+            )
+
     if kind == 'reunion':
         if not target or target['franchise_id'] != fid:
             raise RuleError('The selected reunion card is unavailable.')
@@ -377,7 +451,10 @@ def _bank(repo, fid, job, saved_spin, wedge, target):
         description=description,
         constraints=constraints,
         status='pending',
-        critical=kind in ['dfa', 'demote', 'trade', 'tag'],
+        critical=(
+            kind in ['dfa', 'demote', 'trade', 'tag']
+            or kind in COLD_BAT_EFFECTS
+        ),
         resolution_notes='',
     ))
 
@@ -598,6 +675,9 @@ def continue_spin(repo, fid, job_id, acknowledged=False):
                 'Original trade: ' + wedge['text']
             )
 
+        elif effect in FIXED_REWARD_EFFECTS:
+            _bank(repo, fid, job, saved_spin, wedge, target)
+
         elif effect == 'reunion':
             _bank(repo, fid, job, saved_spin, wedge, target)
 
@@ -660,6 +740,22 @@ def continue_spin(repo, fid, job_id, acknowledged=False):
                 move = repo.get('moves', f"move:{saved_spin['id']}")
                 move.update(status='deferred', critical=False)
                 repo.put('moves', move)
+
+        if job['wheel_id'] == 'cold_bat':
+            run = repo.get('runs', saved_spin['run_id'])
+            decision = dict(run.get('cold_bat_decision', {}))
+            decision.update(
+                status=(
+                    'banked'
+                    if effect in COLD_BAT_EFFECTS
+                    else 'unavailable'
+                ),
+                spin_id=saved_spin['id'],
+                move_id=f"move:{saved_spin['id']}",
+                result=wedge['text'],
+            )
+            run['cold_bat_decision'] = decision
+            repo.put('runs', run)
 
         franchise['state'] = (
             State.WHEEL if franchise['queue']
