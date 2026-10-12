@@ -1,19 +1,12 @@
 from models.domain import State, RuleError, now, ACTIVE_AREAS, POSITIONS
 from services.game_engine import enqueue, snapshot
 from services.roster_service import (
-    locked,
-    remove_player,
-    add_player,
-    arrange,
-    protected,
-    target_pool,
+    locked, remove_player, add_player, arrange, protected, target_pool,
 )
 from services.franchise_tag_service import grant
 from services.franchise_service import audit, settings
 from services.roster_validator import (
-    validate,
-    legal_positions,
-    card_event_errors,
+    validate, legal_positions, card_event_errors,
 )
 
 
@@ -29,7 +22,6 @@ def confirm_end(repo, fid):
 
         run['offseason_step'] = 'mvp'
         f['state'] = State.MVP
-
         repo.put('runs', run)
         repo.put('franchises', f)
 
@@ -50,7 +42,6 @@ def select_mvp(repo, fid, pid):
 
         run.update(mvp=pid, offseason_step='elimination')
         player['protected'] = True
-
         repo.put('players', player)
         repo.put('runs', run)
 
@@ -76,7 +67,6 @@ def progress(repo, fid):
 
         elif f['state'] == State.MELTDOWN:
             mode = run['settings']['meltdown']
-
             if run['wins'] == 0 and run['losses'] == 2 and mode != 'none':
                 enqueue(
                     f,
@@ -86,21 +76,19 @@ def progress(repo, fid):
                 f.update(state=State.WHEEL, return_state=State.MOVES)
             else:
                 f['state'] = State.MOVES
-
             run['offseason_step'] = 'moves'
 
         elif f['state'] == State.MOVES:
             if any(
-                move['status'] == 'pending' and move.get('critical')
-                for move in repo.list('moves', fid)
+                m['status'] == 'pending' and m.get('critical')
+                for m in repo.list('moves', fid)
             ):
                 raise RuleError(
                     'Resolve all critical obligations before reconstruction.'
                 )
-
             if any(
-                challenge['status'] == 'awaiting_manual'
-                for challenge in repo.list('challenges', fid)
+                c['status'] == 'awaiting_manual'
+                for c in repo.list('challenges', fid)
             ):
                 raise RuleError('Confirm manual challenge evidence first.')
 
@@ -109,7 +97,6 @@ def progress(repo, fid):
 
         elif f['state'] == State.REBUILD:
             f['state'] = State.VALIDATION
-
         else:
             raise RuleError('Complete the current action first.')
 
@@ -117,14 +104,110 @@ def progress(repo, fid):
         repo.put('franchises', f)
 
 
+def _team_key(value):
+    """Accept full MLB team names and the common short names."""
+    text = str(value).strip().casefold()
+    teams = {
+        'orioles': 'Baltimore Orioles',
+        'red sox': 'Boston Red Sox',
+        'yankees': 'New York Yankees',
+        'rays': 'Tampa Bay Rays',
+        'blue jays': 'Toronto Blue Jays',
+        'white sox': 'Chicago White Sox',
+        'guardians': 'Cleveland Guardians',
+        'tigers': 'Detroit Tigers',
+        'royals': 'Kansas City Royals',
+        'twins': 'Minnesota Twins',
+        'athletics': 'Athletics',
+        'astros': 'Houston Astros',
+        'angels': 'Los Angeles Angels',
+        'mariners': 'Seattle Mariners',
+        'rangers': 'Texas Rangers',
+        'braves': 'Atlanta Braves',
+        'marlins': 'Miami Marlins',
+        'mets': 'New York Mets',
+        'phillies': 'Philadelphia Phillies',
+        'nationals': 'Washington Nationals',
+        'cubs': 'Chicago Cubs',
+        'reds': 'Cincinnati Reds',
+        'brewers': 'Milwaukee Brewers',
+        'pirates': 'Pittsburgh Pirates',
+        'cardinals': 'St. Louis Cardinals',
+        'diamondbacks': 'Arizona Diamondbacks',
+        'rockies': 'Colorado Rockies',
+        'dodgers': 'Los Angeles Dodgers',
+        'padres': 'San Diego Padres',
+        'giants': 'San Francisco Giants',
+    }
+    return teams.get(text, text).casefold()
+
+
+def trade_card_errors(repo, fid, move, outgoing, incoming):
+    """Shared checks for incoming JSON and existing minor-league cards."""
+    if not isinstance(incoming, dict):
+        return ['Choose or enter one incoming trade card.']
+
+    rules = move.get('constraints', {})
+    required_kind = rules.get('kind', outgoing['kind'])
+    errors = []
+
+    if (
+        outgoing['kind'] != required_kind
+        or incoming.get('kind') != required_kind
+    ):
+        errors.append(
+            'Trade hitters for hitters and pitchers for pitchers.'
+        )
+
+    errors.extend(card_event_errors(incoming, settings(repo, fid)))
+
+    allowed_teams = rules.get('teams', [])
+    if allowed_teams and _team_key(incoming.get('team', '')) not in {
+        _team_key(team) for team in allowed_teams
+    }:
+        errors.append(
+            'Incoming team must match the market spin. Allowed teams: '
+            + ', '.join(allowed_teams)
+        )
+
+    primary = incoming.get('primary')
+    secondary = incoming.get('secondary', [])
+    if (
+        primary not in POSITIONS
+        or not isinstance(secondary, list)
+        or any(position not in POSITIONS for position in secondary)
+    ):
+        errors.append('Enter valid primary and secondary positions.')
+    else:
+        # Use actual card positions, not the automatic DH assignment rule.
+        card_positions = {primary} | set(secondary)
+        allowed_positions = set(rules.get('positions', []))
+        if allowed_positions and not card_positions.intersection(
+            allowed_positions
+        ):
+            errors.append(
+                'An incoming primary or secondary position must match '
+                'the position spin: '
+                + ', '.join(rules['positions'])
+            )
+
+    ovr = incoming.get('ovr')
+    if type(ovr) is not int or not 0 <= ovr <= 99:
+        errors.append('Incoming OVR must be an integer from 0 to 99.')
+    elif rules.get('max_ovr') is not None and ovr > rules['max_ovr']:
+        errors.append(
+            f"Incoming OVR must be {rules['max_ovr']} or lower."
+        )
+
+    return errors
+
+
 def _resolve_reunion(repo, fid, move, target_id, new_player, notes):
-    """Restore the former card selected by the audited wheel spin."""
     pid = move.get('target')
     if not pid or (target_id is not None and target_id != pid):
         raise RuleError(
             'Reunion Signing must use the former card selected by the wheel.'
         )
-
     if new_player is not None:
         raise RuleError(
             'Reunion Signing uses an existing card. '
@@ -155,13 +238,9 @@ def _resolve_reunion(repo, fid, move, target_id, new_player, notes):
 
     errors = card_event_errors(player, settings(repo, fid))
     if errors:
-        raise RuleError(
-            'The reunion card must meet the current Event rules. '
-            + ' '.join(errors)
-        )
+        raise RuleError(' '.join(errors))
 
     before_card = dict(player)
-
     if player['area'] not in ACTIVE_AREAS:
         player.update(
             area='minors',
@@ -169,45 +248,35 @@ def _resolve_reunion(repo, fid, move, target_id, new_player, notes):
             order=max(1, player.get('order', 1)),
         )
 
-    player['historical_only'] = False
-    player['last_reunion_at'] = now()
-    player['last_reunion_move'] = move['id']
+    player.update(
+        historical_only=False,
+        last_reunion_at=now(),
+        last_reunion_move=move['id'],
+    )
     repo.put('players', player)
-
     move['reunion_player_id'] = pid
-
     audit(
-        repo,
-        fid,
-        'reunion_card_return',
-        before_card,
-        dict(player),
-        notes,
-        move.get('run_id'),
+        repo, fid, 'reunion_card_return',
+        before_card, dict(player), notes, move.get('run_id'),
     )
 
 
 def resolve_move(
-    repo,
-    fid,
-    mid,
-    action,
-    notes,
+    repo, fid, mid, action, notes,
     target_id=None,
     new_player=None,
     replace_tag=None,
     confirmed=False,
     cancel_move_id=None,
     max_card_confirmed=False,
+    incoming_player_id=None,
 ):
     with repo.transaction():
         move = repo.get('moves', mid)
         if not move or move['franchise_id'] != fid:
             raise RuleError('Invalid move.')
-
         if move['status'] not in ['pending', 'deferred']:
             return
-
         if locked(repo, fid):
             raise RuleError(
                 'Banked moves can only resolve after the week ends.'
@@ -220,10 +289,13 @@ def resolve_move(
             raise RuleError(
                 'Finish MVP and elimination before resolving moves.'
             )
-
         if not isinstance(notes, str) or not notes.strip() or not confirmed:
             raise RuleError(
                 'Provide resolution notes and confirm the action.'
+            )
+        if incoming_player_id is not None and move['type'] != 'trade':
+            raise RuleError(
+                'An existing incoming card can only be selected for a trade.'
             )
 
         before = dict(move)
@@ -263,11 +335,9 @@ def resolve_move(
                     if cancel_move_id else None
                 )
                 allowed = (
-                    ['dfa']
-                    if move['type'] == 'save_dfa'
+                    ['dfa'] if move['type'] == 'save_dfa'
                     else ['dfa', 'demote', 'trade']
                 )
-
                 if (
                     not other
                     or other['franchise_id'] != fid
@@ -284,9 +354,7 @@ def resolve_move(
                     status='canceled',
                     critical=False,
                     resolved_at=now(),
-                    resolution_notes=(
-                        'Canceled by reward ' + mid + ': ' + notes
-                    ),
+                    resolution_notes='Canceled by reward ' + mid + ': ' + notes,
                 )
                 repo.put('moves', other)
                 audit(
@@ -309,26 +377,21 @@ def resolve_move(
                     raise RuleError(
                         'Choose an existing minor-league player.'
                     )
-
                 area = (
                     'bench' if player['kind'] == 'hitter'
                     else 'rotation' if player['primary'] == 'SP'
                     else 'bullpen'
                 )
                 position = (
-                    player['primary']
-                    if player['kind'] == 'hitter'
-                    else 'SP' if area == 'rotation'
-                    else 'RP'
+                    player['primary'] if player['kind'] == 'hitter'
+                    else 'SP' if area == 'rotation' else 'RP'
                 )
-
                 arrange(
                     repo, fid, pid, area, position, player['order'],
                 )
 
             elif move['type'] in ['dfa', 'demote', 'trade']:
                 pool = target_pool(repo, fid)
-
                 if not pid or pid not in {p['id'] for p in pool}:
                     if not pool:
                         move.update(
@@ -344,112 +407,105 @@ def resolve_move(
                             before, move, notes,
                         )
                         return
-
                     raise RuleError(
                         'Choose an eligible, unprotected active player.'
                     )
 
                 targets = [pid] + [
-                    player['id'] for player in pool
-                    if player['id'] != pid
+                    p['id'] for p in pool if p['id'] != pid
                 ][:quantity - 1]
-
                 if len(targets) < quantity:
                     raise RuleError(
                         'Not enough eligible players for the required quantity.'
                     )
 
+                existing_incoming = None
+                incoming = None
+
                 if move['type'] == 'trade':
-                    if not isinstance(new_player, dict):
-                        raise RuleError('Enter one incoming trade card.')
-
-                    outgoing = repo.get('players', pid)
-                    rules = move.get('constraints', {})
-                    required_kind = rules.get('kind', outgoing['kind'])
-
-                    if (
-                        outgoing['kind'] != required_kind
-                        or new_player.get('kind') != required_kind
-                    ):
+                    if quantity != 1:
                         raise RuleError(
-                            'Trade hitters for hitters and pitchers for pitchers.'
+                            'Trades require one outgoing and one incoming card.'
                         )
-
-                    if new_player.get('eligibility') != 'legal':
-                        raise RuleError(
-                            'The incoming card must be Event-legal.'
+                    if incoming_player_id is not None:
+                        if new_player is not None:
+                            raise RuleError(
+                                'Choose an existing card or submit JSON, not both.'
+                            )
+                        existing_incoming = repo.get(
+                            'players', incoming_player_id,
                         )
-
-                    allowed_teams = rules.get('teams', [])
-                    incoming_team = str(
-                        new_player.get('team', '')
-                    ).strip()
-
-                    if (
-                        allowed_teams
-                        and incoming_team.casefold() not in {
-                            team.casefold() for team in allowed_teams
-                        }
-                    ):
-                        raise RuleError(
-                            'Incoming team must match the market spin. '
-                            'Allowed teams: ' + ', '.join(allowed_teams)
-                        )
-
-                    allowed_positions = rules.get('positions', [])
-                    if (
-                        allowed_positions
-                        and new_player.get('primary')
-                        not in allowed_positions
-                    ):
-                        raise RuleError(
-                            'Incoming primary position must match the '
-                            'position spin: ' + ', '.join(allowed_positions)
-                        )
-
-                    max_ovr = rules.get('max_ovr')
-                    if max_ovr is not None:
-                        incoming_ovr = new_player.get('ovr')
                         if (
-                            type(incoming_ovr) is not int
-                            or not 0 <= incoming_ovr <= max_ovr
+                            not existing_incoming
+                            or existing_incoming['franchise_id'] != fid
+                            or existing_incoming['area'] != 'minors'
+                            or incoming_player_id == pid
                         ):
                             raise RuleError(
-                                f'Incoming OVR must be {max_ovr} or lower.'
+                                'Choose an existing incoming card from '
+                                'this franchise’s Minors.'
                             )
+                        incoming = existing_incoming
+                    else:
+                        if not isinstance(new_player, dict):
+                            raise RuleError(
+                                'Choose an existing card or enter incoming JSON.'
+                            )
+                        incoming = dict(new_player)
+                        incoming['area'] = 'minors'
+                        incoming['position'] = incoming.get('primary', 'C')
+                        incoming['order'] = 1
+
+                    outgoing = repo.get('players', pid)
+                    errors = trade_card_errors(
+                        repo, fid, move, outgoing, incoming,
+                    )
+                    if errors:
+                        raise RuleError(' '.join(errors))
 
                 for target in targets:
                     remove_player(
-                        repo,
-                        fid,
-                        target,
+                        repo, fid, target,
                         'minors' if move['type'] == 'demote' else 'dfa',
                     )
 
                 if move['type'] == 'trade':
-                    add_player(repo, fid, new_player)
+                    move['outgoing_player_id'] = pid
+                    if existing_incoming:
+                        before_card = dict(existing_incoming)
+                        incoming = dict(existing_incoming)
+                        incoming.update(
+                            historical_only=False,
+                            last_trade_move=mid,
+                            last_trade_at=now(),
+                        )
+                        repo.put('players', incoming)
+                        move['incoming_player_id'] = incoming['id']
+                        audit(
+                            repo, fid, 'trade_existing_card',
+                            before_card, incoming, notes, move.get('run_id'),
+                        )
+                    else:
+                        move['incoming_player_id'] = add_player(
+                            repo, fid, incoming,
+                        )
 
             elif move['type'] == 'tag':
                 if (
                     not pid
                     or grant(
-                        repo,
-                        fid,
-                        pid,
-                        replace_tag,
+                        repo, fid, pid, replace_tag,
                         source=move['description'],
                     ) == 'cap_decision_required'
                 ):
                     raise RuleError(
-                        'Choose a tag holder to replace, '
-                        'or decline this new tag.'
+                        'Choose a tag holder to replace, or decline this new tag.'
                     )
 
             elif move['type'] == 'protect':
                 player = repo.get('players', pid) if pid else None
                 if not player or player['franchise_id'] != fid:
                     raise RuleError('Select a protection target.')
-
                 player['protected'] = True
                 if 'Next Run' in move['description']:
                     player['protection_until_run'] = (
@@ -489,41 +545,32 @@ def resolve_move(
                 player = repo.get('players', recipient_id)
                 if not player or player['franchise_id'] != fid:
                     raise RuleError('The upgrade player is unavailable.')
-
                 if player['area'] not in ACTIVE_AREAS:
                     raise RuleError(
                         'The player must be on the active roster. '
                         'Defer the upgrade if they have been removed.'
                     )
-
                 if not isinstance(new_player, dict):
                     raise RuleError(
                         'Enter one upgraded card as a JSON object.'
                     )
-
                 if (
                     new_player.get('name', '').strip().casefold()
                     != player['name'].strip().casefold()
                 ):
                     raise RuleError('The upgrade must be the same player.')
-
                 if new_player.get('kind') != player['kind']:
                     raise RuleError(
                         'The upgraded card must have the same player type.'
                     )
 
                 ovr = new_player.get('ovr')
-                if (
-                    type(ovr) is not int
-                    or not player['ovr'] < ovr <= 99
-                ):
+                if type(ovr) is not int or not player['ovr'] < ovr <= 99:
                     raise RuleError(
                         'The upgraded OVR must be higher, up to 99.'
                     )
-
                 if not str(new_player.get('version', '')).strip():
                     raise RuleError('Enter the upgraded card version.')
-
                 if new_player.get('eligibility') != 'legal':
                     raise RuleError(
                         'Confirm that the upgraded card is Event-legal.'
@@ -542,7 +589,6 @@ def resolve_move(
 
                 before_card = dict(player)
                 upgraded = dict(player)
-
                 for field in [
                     'version', 'ovr', 'primary', 'secondary',
                     'team', 'series', 'bat', 'throw', 'eligibility',
@@ -558,13 +604,8 @@ def resolve_move(
 
                 repo.put('players', upgraded)
                 audit(
-                    repo,
-                    fid,
-                    'development_card_upgrade',
-                    before_card,
-                    upgraded,
-                    notes,
-                    move['run_id'],
+                    repo, fid, 'development_card_upgrade',
+                    before_card, upgraded, notes, move['run_id'],
                 )
 
             elif move['type'] == 'acquire':
@@ -573,10 +614,7 @@ def resolve_move(
                     else [new_player] if new_player else []
                 )
                 if len(incoming) != quantity:
-                    raise RuleError(
-                        f'Provide {quantity} incoming card(s).'
-                    )
-
+                    raise RuleError(f'Provide {quantity} incoming card(s).')
                 for card in incoming:
                     add_player(repo, fid, card)
 
@@ -588,15 +626,9 @@ def resolve_move(
 
         move.update(resolution_notes=notes, resolved_at=now())
         repo.put('moves', move)
-
         audit(
-            repo,
-            fid,
-            'resolve_move',
-            before,
-            move,
-            notes,
-            move.get('run_id'),
+            repo, fid, 'resolve_move',
+            before, move, notes, move.get('run_id'),
         )
 
 
@@ -620,8 +652,7 @@ def finish_validation(repo, fid):
         for player in repo.list('players', fid):
             player.update(
                 protected=bool(
-                    player.get('protection_until_run', 0)
-                    > current_number
+                    player.get('protection_until_run', 0) > current_number
                 ),
                 hot_seat=False,
             )
