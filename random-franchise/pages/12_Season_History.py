@@ -6,7 +6,11 @@ import streamlit.components.v1 as components
 
 from models.domain import RuleError, now
 from services.franchise_service import audit
-from services.stat_engine import aggregate_season
+from services.stat_engine import (
+    aggregate_season,
+    mvp_score,
+    PITCHER_BASELINE_ER_PER_THREE_INNINGS,
+)
 from ui.common import run_page, table
 from ui.wheel_room import card_url, stadium_url
 
@@ -59,14 +63,62 @@ def stat_summary(candidate):
     )
 
 
+def assign_ranks(candidates):
+    """Equal scores share a rank: for example, 1, 1, 3."""
+    counts = {}
+
+    for candidate in candidates:
+        key = round(candidate['score'], 10)
+        counts[key] = counts.get(key, 0) + 1
+
+    previous = None
+    rank = 0
+
+    for index, candidate in enumerate(candidates, 1):
+        key = round(candidate['score'], 10)
+
+        if key != previous:
+            rank = index
+
+        candidate['rank'] = rank
+        candidate['tied'] = counts[key] > 1
+        previous = key
+
+
+def rank_label(candidate):
+    prefix = 'Tied #' if candidate.get('tied') else '#'
+    return prefix + str(candidate['rank'])
+
+
+def candidate_rows(candidates):
+    return [
+        {
+            'Rank': rank_label(candidate),
+            'Player': candidate['player']['name'],
+            'Type': candidate['player']['kind'].title(),
+            'Card': (
+                str(candidate['player'].get('ovr', ''))
+                + ' · '
+                + str(
+                    candidate['player'].get('series')
+                    or candidate['player'].get('version')
+                    or ''
+                )
+            ),
+            'Season Value': round(candidate['score'], 2),
+            'Performance': stat_summary(candidate),
+        }
+        for candidate in candidates
+    ]
+
+
 def trophy_display(featured, candidates, awarded=False):
     player = featured['player']
 
-    same_kind = [
+    other_candidates = [
         candidate
         for candidate in candidates
-        if candidate['player']['kind'] == player['kind']
-        and candidate['player']['id'] != player['id']
+        if candidate['player']['id'] != player['id']
     ][:2]
 
     image = card_url(player)
@@ -90,28 +142,23 @@ def trophy_display(featured, candidates, awarded=False):
         )
 
     heading = 'SEASON MVP' if awarded else 'SEASON MVP WATCH'
-    category = 'hitting' if player['kind'] == 'hitter' else 'pitching'
 
     note = (
         'Your saved season award.'
         if awarded
         else (
-            'Featured hitting candidate • '
+            'Top overall candidate • '
             'Final Season MVP has not been selected.'
         )
     )
 
     runners = ''
 
-    for index, candidate in enumerate(same_kind, 1):
+    for candidate in other_candidates:
         other = candidate['player']
 
-        # Candidate rankings are not saved second/third-place awards.
-        label = (
-            'OTHER ' + category.upper() + ' CANDIDATE'
-            if awarded
-            else f'#{index + 1} HITTING CANDIDATE'
-        )
+        # These ranks describe scores, not saved runner-up awards.
+        label = rank_label(candidate) + ' OVERALL CANDIDATE'
 
         runners += (
             '<div class="runner">'
@@ -121,6 +168,8 @@ def trophy_display(featured, candidates, awarded=False):
             + html.escape(other['name'])
             + '</div><div class="small">'
             + html.escape(stat_summary(candidate))
+            + '<br>Season Value '
+            + f"{candidate['score']:.2f}"
             + '</div></div>'
         )
 
@@ -147,7 +196,7 @@ def trophy_display(featured, candidates, awarded=False):
         + '</div><div class="stats">'
         + html.escape(stat_summary(featured))
         + '</div><div class="value">Season Value '
-        + f"{featured['score']:.1f}"
+        + f"{featured['score']:.2f}"
         + '</div><div class="small">'
         + html.escape(note)
         + '</div></div><div class="art">'
@@ -649,17 +698,10 @@ def render(repo, f):
             )
         )
 
-        if player['kind'] == 'hitter':
-            score = (
-                totals.get('tb', 0)
-                + totals.get('bb', 0)
-                + totals.get('hbp', 0)
-                + totals.get('r', 0)
-                + totals.get('rbi', 0)
-                + totals.get('sb', 0)
-                - totals.get('cs', 0)
-            )
+        # Use the exact function used by Weekly MVP.
+        score = mvp_score(player['kind'], totals)
 
+        if player['kind'] == 'hitter':
             hitters.append({
                 'Player': player['name'],
                 'Card': card_label,
@@ -675,14 +717,6 @@ def render(repo, f):
             })
 
         else:
-            score = (
-                totals.get('outs', 0)
-                + totals.get('so', 0)
-                - 3 * totals.get('er', 0)
-                - totals.get('ha', 0)
-                - totals.get('bb', 0)
-            )
-
             pitchers.append({
                 'Player': player['name'],
                 'Card': card_label,
@@ -697,11 +731,18 @@ def render(repo, f):
                 'Saves': totals['sv'],
             })
 
-        candidates.append({
-            'player': player,
-            'totals': totals,
-            'score': score,
-        })
+        participated = (
+            totals.get('pa', 0) > 0
+            if player['kind'] == 'hitter'
+            else totals.get('outs', 0) > 0
+        )
+
+        if participated:
+            candidates.append({
+                'player': player,
+                'totals': totals,
+                'score': score,
+            })
 
     hitters.sort(
         key=lambda row: row['Season Value'],
@@ -712,9 +753,13 @@ def render(repo, f):
         reverse=True,
     )
     candidates.sort(
-        key=lambda row: row['score'],
-        reverse=True,
+        key=lambda row: (
+            -row['score'],
+            row['player']['name'].casefold(),
+        ),
     )
+
+    assign_ranks(candidates)
 
     trophy_tab, stats_tab, weeks_tab, manage_tab = st.tabs([
         '🏆 Trophy case',
@@ -733,13 +778,8 @@ def render(repo, f):
             None,
         )
 
-        featured = saved or next(
-            (
-                candidate
-                for candidate in candidates
-                if candidate['player']['kind'] == 'hitter'
-            ),
-            None,
+        featured = saved or (
+            candidates[0] if candidates else None
         )
 
         if featured:
@@ -747,12 +787,6 @@ def render(repo, f):
                 featured,
                 candidates,
                 awarded=bool(saved),
-            )
-
-        elif candidates:
-            st.info(
-                'No final MVP selected. '
-                'Pitching candidates are shown below.'
             )
 
         else:
@@ -777,18 +811,12 @@ def render(repo, f):
         st.caption(
             'Featured candidates are suggestions. '
             'Your saved Season MVP is always your choice. '
-            'Hitting and pitching values are compared separately.'
+            'Hitters and pitchers share the Weekly MVP scoring system. '
+            'Rankings use saved stats; missing box scores can affect them.'
         )
 
-        left, right = st.columns(2)
-
-        with left:
-            st.markdown('**Top hitting candidates**')
-            table(hitters[:3])
-
-        with right:
-            st.markdown('**Top pitching candidates**')
-            table(pitchers[:3])
+        st.markdown('**Overall Season MVP candidates**')
+        table(candidate_rows(candidates[:5]))
 
         with st.expander('Past Season MVPs'):
             completed = [
@@ -844,21 +872,36 @@ def render(repo, f):
         with pitching_tab:
             table(pitchers)
 
+        with st.expander('Overall MVP leaderboard'):
+            table(candidate_rows(candidates))
+
         with st.expander('How Season Value is calculated'):
             st.write(
-                'Hitters: total bases + walks + HBP + runs + RBI '
-                '+ steals − caught stealing.'
+                'Uses the same mvp_score function as Weekly MVP, applied '
+                'to all saved stats in this season. Values accumulate '
+                'across weeks; they are not per-game averages.'
             )
 
             st.write(
-                'Pitchers: outs + strikeouts − (3 × earned runs) '
-                '− hits allowed − walks.'
+                'Hitters: 0.5 × singles + 0.8 × doubles + 1.1 × triples '
+                '+ 1.4 × home runs + 0.3 × (walks + HBP) '
+                '− 0.25 × (hitless at-bats + sacrifice flies) '
+                '+ 0.2 × steals − 0.3 × caught stealing.'
+            )
+
+            baseline = PITCHER_BASELINE_ER_PER_THREE_INNINGS
+
+            st.write(
+                f'Pitchers: outs × {baseline:g} ÷ 9 − earned runs. '
+                f'The current house baseline is {baseline:g} earned '
+                'runs per three innings.'
             )
 
             st.caption(
-                'This page retains your existing season formulas. '
-                'They are separate category scores and are not calibrated '
-                'for ranking hitters against pitchers.'
+                'Custom estimated run value, not WAR. Actual innings and '
+                'ERA stay unchanged. Runs and RBI remain visible but '
+                'are not added again to the hitter score. Ties remain ties. '
+                'Changing the ranking does not replace a saved Season MVP.'
             )
 
     with weeks_tab:
