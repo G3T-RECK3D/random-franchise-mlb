@@ -24,7 +24,7 @@ def start_run(repo, fid):
     with repo.transaction():
         f = repo.get('franchises', fid)
         if f['state'] not in [
-            State.SETUP, State.READY, State.VALIDATION
+            State.SETUP, State.READY, State.VALIDATION,
         ]:
             raise RuleError(
                 'Finish the current workflow before starting a week.'
@@ -32,8 +32,7 @@ def start_run(repo, fid):
 
         season = (
             repo.get('seasons', f['current_season'])
-            if f.get('current_season')
-            else None
+            if f.get('current_season') else None
         )
         if (
             not season
@@ -188,16 +187,92 @@ def _route(repo, f, run, game):
             enqueue(f, 'hot_seat', 'loss', game['id'])
 
         f['return_state'] = State.ACTIVE
-        f['state'] = (
-            State.WHEEL if f['queue'] else State.ACTIVE
-        )
+        f['state'] = State.WHEEL if f['queue'] else State.ACTIVE
 
     repo.put('runs', run)
     repo.put('franchises', f)
 
 
-def _save_lines(repo, fid, run, game, lines):
+def _capture_assignments(repo, fid, run):
+    """Record roster assignments when a new game is saved."""
+    roster_ids = set(run['roster_ids'])
+    return {
+        player['id']: {
+            'area': player['area'],
+            'order': player.get('order'),
+            'position': player.get('position'),
+        }
+        for player in repo.list('players', fid)
+        if player['id'] in roster_ids
+    }
+
+
+def _line_assignment(game, pid, previous_rows, starting_players):
+    """Never substitute today's roster for a historical game's roster."""
+    previous = previous_rows.get(pid, {})
+
+    if 'roster_area' in previous or 'batting_order' in previous:
+        return {
+            'roster_area': previous.get('roster_area'),
+            'batting_order': previous.get('batting_order'),
+            'assigned_position': previous.get('assigned_position'),
+            'assignment_source': previous.get(
+                'assignment_source', 'saved',
+            ),
+        }
+
+    assignment = game.get('roster_assignments', {}).get(pid)
+    source = 'game_save'
+
+    if assignment is None:
+        assignment = starting_players.get(pid)
+        source = 'start_snapshot'
+
+    if assignment is None:
+        return {
+            'roster_area': None,
+            'batting_order': None,
+            'assigned_position': None,
+            'assignment_source': 'unavailable',
+        }
+
+    area = assignment.get('area')
+    order = assignment.get('order')
+    batting_order = (
+        order
+        if area == 'lineup'
+        and type(order) is int
+        and 1 <= order <= 9
+        else None
+    )
+
+    return {
+        'roster_area': area,
+        'batting_order': batting_order,
+        'assigned_position': assignment.get('position'),
+        'assignment_source': source,
+    }
+
+
+def _save_lines(
+    repo, fid, run, game, lines, previous_rows=None,
+):
     seen = set()
+    previous_rows = previous_rows or {}
+
+    starting_snapshot = repo.get(
+        'snapshots', f"{run['id']}:start",
+    )
+    starting_players = {}
+    if (
+        starting_snapshot
+        and starting_snapshot.get('franchise_id') == fid
+        and starting_snapshot.get('run_id') == run['id']
+    ):
+        starting_players = {
+            player['id']: player
+            for player in starting_snapshot.get('players', [])
+        }
 
     for item in lines:
         pid = item['player_id']
@@ -235,7 +310,9 @@ def _save_lines(repo, fid, run, game, lines):
                     'Perfect game requires zero walks and runs.'
                 )
 
-        repo.put('stats', dict(
+        # Preserve recovery markers and other existing metadata.
+        saved = dict(previous_rows.get(pid, {}))
+        saved.update(
             id=f"{game['id']}:{pid}",
             franchise_id=fid,
             run_id=run['id'],
@@ -243,7 +320,13 @@ def _save_lines(repo, fid, run, game, lines):
             game_id=game['id'],
             line=line,
             flags=flags,
-        ))
+        )
+        saved.update(
+            _line_assignment(
+                game, pid, previous_rows, starting_players,
+            )
+        )
+        repo.put('stats', saved)
 
         if flags.get('no_hitter') or flags.get('perfect_game'):
             status = grant(
@@ -294,8 +377,7 @@ def record_game(
         f = repo.get('franchises', fid)
         run = (
             repo.get('runs', f['current_run'])
-            if f['current_run']
-            else None
+            if f['current_run'] else None
         )
 
         if (
@@ -347,6 +429,7 @@ def record_game(
             date=str(date or now()[:10]),
             notes=notes,
             created_at=now(),
+            roster_assignments=_capture_assignments(repo, fid, run),
         )
         repo.put('games', game)
         _save_lines(repo, fid, run, game, lines or [])
@@ -361,7 +444,7 @@ def record_game(
 
 
 def correct_game(repo, fid, gid, lines, reason, result=None):
-    """Correct stats; restrict outcome edits to an unprocessed latest game."""
+    """Correct stats while preserving historical roster assignments."""
     with repo.transaction():
         game = repo.get('games', gid)
         if (
@@ -381,6 +464,10 @@ def correct_game(repo, fid, gid, lines, reason, result=None):
                 if stat['game_id'] == gid
             ],
         )
+        previous_rows = {
+            stat['player_id']: stat for stat in before['stats']
+        }
+
         run = repo.get('runs', game['run_id'])
         f = repo.get('franchises', fid)
         changed = result is not None and result != game['result']
@@ -400,8 +487,8 @@ def correct_game(repo, fid, gid, lines, reason, result=None):
 
             if (
                 any(
-                    spin.get('game_id') == gid
-                    for spin in repo.list('spins', fid)
+                    saved_spin.get('game_id') == gid
+                    for saved_spin in repo.list('spins', fid)
                 )
                 or run.get('offseason_step')
             ):
@@ -434,7 +521,10 @@ def correct_game(repo, fid, gid, lines, reason, result=None):
         for stat in before['stats']:
             repo.delete('stats', stat['id'])
 
-        _save_lines(repo, fid, run, game, lines)
+        _save_lines(
+            repo, fid, run, game, lines,
+            previous_rows=previous_rows,
+        )
         evaluate(repo, fid, run['id'], gid)
 
         audit(
