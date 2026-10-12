@@ -222,11 +222,10 @@ def add_styles():
         background_url = (
             'data:image/svg+xml;charset=utf-8,' + quote(skyline)
         )
-        st.warning(
+                st.warning(
             'Upload assets/stadium_background.png '
             'to display the cinematic background.'
         )
-    )
 
     css = '''
     <style>
