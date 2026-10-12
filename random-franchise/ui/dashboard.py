@@ -82,212 +82,357 @@ def player_art_url(player):
 
 
 def add_styles():
-    st.markdown(
-        """
-        <style>
+    from urllib.parse import quote
+
+    skyline = '''
+    <svg xmlns="http://www.w3.org/2000/svg"
+         width="1600" height="420" viewBox="0 0 1600 420">
+      <defs>
+        <linearGradient id="sky" x2="0" y2="1">
+          <stop stop-color="#160d19"/>
+          <stop offset=".65" stop-color="#692334"/>
+          <stop offset="1" stop-color="#e58643"/>
+        </linearGradient>
+        <linearGradient id="building" x2="0" y2="1">
+          <stop stop-color="#202332"/>
+          <stop offset="1" stop-color="#090d16"/>
+        </linearGradient>
+        <radialGradient id="red">
+          <stop stop-color="#ff304b" stop-opacity=".65"/>
+          <stop offset="1" stop-color="#ff304b" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="gold">
+          <stop stop-color="#ffcf79" stop-opacity=".55"/>
+          <stop offset="1" stop-color="#ffcf79" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="light">
+          <stop stop-color="#fff7d4" stop-opacity=".85"/>
+          <stop offset=".18" stop-color="#ffe2ad" stop-opacity=".35"/>
+          <stop offset="1" stop-color="#ffe2ad" stop-opacity="0"/>
+        </radialGradient>
+        <pattern id="windows" width="20" height="26"
+                 patternUnits="userSpaceOnUse">
+          <rect x="6" y="7" width="5" height="8"
+                rx="1" fill="#f7bd6d" opacity=".65"/>
+        </pattern>
+        <pattern id="seats" width="18" height="13"
+                 patternUnits="userSpaceOnUse">
+          <rect x="3" y="3" width="10" height="4"
+                rx="1" fill="#d64b4e" opacity=".55"/>
+        </pattern>
+      </defs>
+
+      <rect width="1600" height="420" fill="url(#sky)"/>
+      <ellipse cx="1470" cy="120" rx="390" ry="240" fill="url(#red)"/>
+      <ellipse cx="1010" cy="300" rx="390" ry="180" fill="url(#gold)"/>
+
+      <g fill="#22202d" opacity=".65">
+        <path d="M360 335V230H410V335H425V190H470V335
+                 H490V255H530V335H545V205H600V335H620
+                 V170H665V335H680V235H720V335H735V180
+                 H775V335H800V250H845V335H860V205H910
+                 V335H925V155H975V335H995V230H1040
+                 V335H1055V180H1100V335H1120V240H1180
+                 V335H1200V200H1250V335H1270V235H1330
+                 V335H1350V190H1400V335H1430V235H1500
+                 V335H1600V420H360Z"/>
+      </g>
+
+      <g fill="url(#building)" stroke="#68505a" stroke-width="1">
+        <rect x="525" y="215" width="72" height="170"/>
+        <rect x="615" y="165" width="86" height="220"/>
+        <path d="M635 165V140H680V165Z"/>
+        <rect x="715" y="235" width="60" height="150"/>
+        <rect x="790" y="180" width="95" height="205"/>
+        <rect x="895" y="245" width="65" height="140"/>
+        <rect x="970" y="135" width="90" height="250"/>
+        <path d="M985 135V110H1045V135Z"/>
+        <rect x="1075" y="215" width="85" height="170"/>
+        <rect x="1175" y="170" width="95" height="215"/>
+        <rect x="1290" y="235" width="95" height="150"/>
+        <rect x="1400" y="190" width="85" height="195"/>
+      </g>
+
+      <g fill="url(#windows)" opacity=".8">
+        <rect x="535" y="225" width="52" height="145"/>
+        <rect x="625" y="180" width="66" height="190"/>
+        <rect x="725" y="245" width="40" height="125"/>
+        <rect x="800" y="195" width="75" height="175"/>
+        <rect x="905" y="255" width="45" height="115"/>
+        <rect x="980" y="150" width="70" height="220"/>
+        <rect x="1085" y="230" width="65" height="140"/>
+        <rect x="1185" y="185" width="75" height="185"/>
+        <rect x="1300" y="250" width="75" height="120"/>
+        <rect x="1410" y="205" width="65" height="165"/>
+      </g>
+
+      <g stroke="#ff5b63" stroke-width="2" opacity=".7">
+        <path d="M615 165H701M790 180H885M970 135H1060
+                 M1175 170H1270M1400 190H1485"/>
+      </g>
+
+      <g fill="#191925" stroke="#b17b65" stroke-width="1">
+        <path d="M875 325V195H893V168H910V145L927 168
+                 V195H945V325Z"/>
+        <path d="M910 145V122"/>
+        <rect x="879" y="242" width="62" height="83"/>
+      </g>
+      <circle cx="910" cy="210" r="12" fill="#e2b77a"/>
+      <path d="M910 202V210L916 214" fill="none"
+            stroke="#5b3434" stroke-width="2"/>
+
+      <path d="M340 365Q970 260 1600 345V420H340Z"
+            fill="#0b111b"/>
+      <path d="M340 366Q970 272 1600 347"
+            fill="none" stroke="#e19362" stroke-width="3"/>
+      <path d="M390 388Q970 295 1580 367"
+            fill="none" stroke="url(#seats)" stroke-width="32"/>
+      <path d="M410 406Q970 321 1550 395"
+            fill="none" stroke="#ff334f" stroke-width="2" opacity=".6"/>
+
+      <g stroke="#555968" stroke-width="5">
+        <path d="M540 355V142M1320 344V112"/>
+      </g>
+      <g fill="#fff1cf">
+        <rect x="513" y="132" width="55" height="16" rx="3"/>
+        <rect x="1293" y="102" width="55" height="16" rx="3"/>
+      </g>
+      <ellipse cx="540" cy="140" rx="130" ry="120" fill="url(#light)"/>
+      <ellipse cx="1320" cy="110" rx="150" ry="140" fill="url(#light)"/>
+
+      <path d="M1110 15L1510 415M1220 0L1600 380"
+            stroke="#ff334f" stroke-width="2" opacity=".15"/>
+    </svg>
+    '''
+    background_url = (
+        'data:image/svg+xml;charset=utf-8,' + quote(skyline)
+    )
+
+    css = '''
+    <style>
+    .broadcast-hero {
+        position:relative;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:30px;
+        width:100%;
+        max-width:none;
+        margin:0 0 18px;
+        padding:28px 36px;
+        min-height:300px;
+        box-sizing:border-box;
+        overflow:hidden;
+        border:1px solid #8d5140;
+        border-top:4px solid #ff334f;
+        border-radius:16px;
+        background-image:
+            linear-gradient(
+                90deg,
+                rgba(7,12,21,.96) 0%,
+                rgba(7,12,21,.87) 28%,
+                rgba(7,12,21,.48) 56%,
+                rgba(7,12,21,.18) 100%
+            ),
+            url("__CITY_BACKGROUND__");
+        background-size:cover;
+        background-position:center;
+        box-shadow:0 8px 30px #0004,0 0 25px #ff334f10;
+    }
+    .broadcast-copy {
+        position:relative;
+        z-index:1;
+        flex:1;
+        min-width:0;
+    }
+    .broadcast-eyebrow {
+        color:#ffcf79;
+        font-size:12px;
+        font-weight:800;
+        letter-spacing:2px;
+        text-transform:uppercase;
+    }
+    .broadcast-name {
+        color:#ffe4a3;
+        font-size:clamp(30px,4vw,50px);
+        font-weight:900;
+        line-height:1.1;
+        margin:12px 0 18px;
+        overflow-wrap:anywhere;
+        text-shadow:0 3px 12px #0009;
+    }
+    .broadcast-stat-row {
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+    }
+    .broadcast-stat {
+        min-width:68px;
+        padding:10px 16px;
+        background:#080d16c9;
+        border:1px solid #c79f6545;
+        border-radius:9px;
+        text-align:center;
+        backdrop-filter:blur(5px);
+    }
+    .broadcast-stat strong {
+        display:block;
+        color:#fff6dd;
+        font-size:27px;
+    }
+    .broadcast-stat span {
+        color:#d1c3ac;
+        font-size:11px;
+        letter-spacing:1px;
+    }
+    .broadcast-note {
+        color:#d4d9e4;
+        font-size:13px;
+        margin-top:16px;
+        line-height:1.5;
+        max-width:650px;
+        text-shadow:0 2px 5px #000;
+    }
+    .broadcast-art {
+        position:relative;
+        z-index:1;
+        flex:0 0 175px;
+        width:175px;
+        height:245px;
+        display:grid;
+        place-items:center;
+        margin-right:12px;
+    }
+    .broadcast-art img {
+        position:absolute;
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        filter:
+            drop-shadow(0 10px 20px #0009)
+            drop-shadow(0 0 12px #ffcc6645);
+    }
+    .broadcast-art-fallback {
+        width:125px;
+        height:160px;
+        display:grid;
+        place-items:center;
+        color:#ffcf79;
+        border:1px solid #d1a05b;
+        border-radius:12px;
+        background:linear-gradient(145deg,#421c26,#121824);
+        font-size:38px;
+        font-weight:900;
+    }
+    .broadcast-score {
+        background:
+            radial-gradient(ellipse at top right,#9c293526,transparent 70%),
+            linear-gradient(135deg,#1b202c,#10151e);
+        border:1px solid #53403b;
+        border-top:3px solid #e5394d;
+        border-radius:10px;
+        padding:14px;
+        min-height:95px;
+        box-sizing:border-box;
+    }
+    .broadcast-score-label {
+        color:#cfc4b4;
+        font-size:11px;
+        font-weight:700;
+        letter-spacing:1px;
+        margin-bottom:9px;
+    }
+    .broadcast-score-value {
+        color:#fff0cb;
+        font-size:28px;
+        line-height:1.15;
+        font-weight:900;
+    }
+    .broadcast-next {
+        border-left:4px solid #ff334f;
+        padding:5px 0 5px 14px;
+    }
+    .broadcast-next strong {
+        display:block;
+        color:#ffb2be;
+        font-size:12px;
+        letter-spacing:2px;
+        margin-bottom:5px;
+    }
+    .broadcast-next span {
+        color:#d9dee7;
+        font-size:14px;
+    }
+    .broadcast-tracker {
+        display:grid;
+        grid-template-columns:repeat(6,minmax(0,1fr));
+        gap:8px;
+        margin:12px 0;
+    }
+    .broadcast-step {
+        padding:13px 6px;
+        text-align:center;
+        border:1px solid #343b49;
+        background:#111721;
+        border-radius:9px;
+    }
+    .broadcast-step-icon {
+        font-size:20px;
+        margin-bottom:7px;
+    }
+    .broadcast-step-name {
+        color:#e4e8ee;
+        font-size:12px;
+        font-weight:700;
+    }
+    .broadcast-step-status {
+        color:#8590a2;
+        font-size:10px;
+        margin-top:5px;
+    }
+    .broadcast-step.current {
+        border-color:#e1b863;
+        background:linear-gradient(140deg,#47351b,#1a1c22);
+    }
+    .broadcast-step.current .broadcast-step-status {
+        color:#ffdc8c;
+    }
+    .broadcast-step.done {
+        border-color:#35544d;
+    }
+    .broadcast-step.done .broadcast-step-status {
+        color:#84d2b2;
+    }
+    @media(max-width:650px) {
         .broadcast-hero {
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:24px;
-            padding:24px 30px;
-            max-width:1200px;
-            margin:0 auto 18px;
-            min-height:245px;
-            box-sizing:border-box;
-            overflow:hidden;
-            border:1px solid #543b31;
-            border-top:4px solid #d92640;
-            border-radius:16px;
-            background:
-                radial-gradient(
-                    ellipse at 90% 10%,#9d233b55,transparent 50%
-                ),
-                repeating-linear-gradient(
-                    125deg,transparent 0px,transparent 65px,
-                    #ffffff03 66px,#ffffff03 68px
-                ),
-                linear-gradient(120deg,#171b25,#0c1018);
-        }
-        .broadcast-copy {
-            flex:1;
-            min-width:0;
-        }
-        .broadcast-eyebrow {
-            color:#f3ce7d;
-            font-size:12px;
-            font-weight:800;
-            letter-spacing:2px;
-            text-transform:uppercase;
-        }
-        .broadcast-name {
-            color:#fff3d0;
-            font-size:clamp(28px,4vw,44px);
-            font-weight:900;
-            line-height:1.1;
-            margin:10px 0 16px;
-            overflow-wrap:anywhere;
-        }
-        .broadcast-stat-row {
-            display:flex;
-            flex-wrap:wrap;
-            gap:10px;
-        }
-        .broadcast-stat {
-            min-width:65px;
-            padding:9px 14px;
-            background:#080d16aa;
-            border:1px solid #ffffff20;
-            border-radius:9px;
-            text-align:center;
-        }
-        .broadcast-stat strong {
-            display:block;
-            color:white;
-            font-size:25px;
-        }
-        .broadcast-stat span {
-            color:#c9cdd6;
-            font-size:11px;
-            letter-spacing:1px;
-        }
-        .broadcast-note {
-            color:#bbc3d1;
-            font-size:13px;
-            margin-top:14px;
-            line-height:1.5;
+            padding:20px;
+            gap:12px;
+            min-height:235px;
         }
         .broadcast-art {
-            flex:0 0 145px;
-            width:145px;
-            height:205px;
-            position:relative;
-            display:grid;
-            place-items:center;
-        }
-        .broadcast-art img {
-            position:absolute;
-            width:100%;
-            height:100%;
-            object-fit:contain;
-            filter:drop-shadow(0 8px 16px #0008);
+            flex-basis:105px;
+            width:105px;
+            height:155px;
+            margin-right:0;
         }
         .broadcast-art-fallback {
-            width:110px;
-            height:145px;
-            display:grid;
-            place-items:center;
-            color:#f3ce7d;
-            border:1px solid #b88b43;
-            border-radius:12px;
-            background:linear-gradient(145deg,#321921,#121824);
-            font-size:34px;
-            font-weight:900;
-        }
-        .broadcast-score {
-            background:linear-gradient(135deg,#1b202c,#10151e);
-            border:1px solid #343a49;
-            border-top:3px solid #d92640;
-            border-radius:10px;
-            padding:14px;
-            min-height:95px;
-            box-sizing:border-box;
-        }
-        .broadcast-score-label {
-            color:#bfc5d1;
-            font-size:11px;
-            font-weight:700;
-            letter-spacing:1px;
-            margin-bottom:9px;
-        }
-        .broadcast-score-value {
-            color:white;
+            width:90px;
+            height:125px;
             font-size:28px;
-            line-height:1.15;
-            font-weight:900;
         }
-        .broadcast-next {
-            border-left:4px solid #ff334f;
-            padding:5px 0 5px 14px;
+        .broadcast-stat {
+            min-width:45px;
+            padding:7px;
         }
-        .broadcast-next strong {
-            display:block;
-            color:#ffb2be;
-            font-size:12px;
-            letter-spacing:2px;
-            margin-bottom:5px;
-        }
-        .broadcast-next span {
-            color:#d9dee7;
-            font-size:14px;
-        }
+        .broadcast-stat strong { font-size:20px; }
         .broadcast-tracker {
-            display:grid;
-            grid-template-columns:repeat(6,minmax(0,1fr));
-            gap:8px;
-            margin:12px 0;
+            grid-template-columns:repeat(3,minmax(0,1fr));
         }
-        .broadcast-step {
-            padding:13px 6px;
-            text-align:center;
-            border:1px solid #343b49;
-            background:#111721;
-            border-radius:9px;
-        }
-        .broadcast-step-icon {
-            font-size:20px;
-            margin-bottom:7px;
-        }
-        .broadcast-step-name {
-            color:#e4e8ee;
-            font-size:12px;
-            font-weight:700;
-        }
-        .broadcast-step-status {
-            color:#8590a2;
-            font-size:10px;
-            margin-top:5px;
-        }
-        .broadcast-step.current {
-            border-color:#e1b863;
-            background:linear-gradient(140deg,#47351b,#1a1c22);
-        }
-        .broadcast-step.current .broadcast-step-status {
-            color:#ffdc8c;
-        }
-        .broadcast-step.done {
-            border-color:#35544d;
-        }
-        .broadcast-step.done .broadcast-step-status {
-            color:#84d2b2;
-        }
-        @media(max-width:650px) {
-            .broadcast-hero {
-                padding:18px;
-                gap:12px;
-                min-height:215px;
-            }
-            .broadcast-art {
-                flex-basis:95px;
-                width:95px;
-                height:140px;
-            }
-            .broadcast-art-fallback {
-                width:85px;
-                height:115px;
-                font-size:27px;
-            }
-            .broadcast-stat {
-                min-width:45px;
-                padding:7px;
-            }
-            .broadcast-stat strong { font-size:20px; }
-            .broadcast-tracker {
-                grid-template-columns:repeat(3,minmax(0,1fr));
-            }
-        }
-        </style>
-        """,
+    }
+    </style>
+    '''
+    st.markdown(
+        css.replace('__CITY_BACKGROUND__', background_url),
         unsafe_allow_html=True,
     )
 
