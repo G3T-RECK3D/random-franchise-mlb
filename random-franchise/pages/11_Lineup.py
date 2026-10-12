@@ -1,37 +1,117 @@
 import html
+import re
+import unicodedata
+from urllib.parse import urlsplit
+
 import streamlit as st
 import streamlit.components.v1 as components
+
 from ui.common import run_page, table
 
 
+def text_key(value):
+    text = unicodedata.normalize(
+        'NFKD', str(value or '').strip().casefold()
+    )
+    text = ''.join(
+        character for character in text
+        if not unicodedata.combining(character)
+    )
+    return ' '.join(re.findall(r'[a-z0-9]+', text))
+
+
+CARD_ART = {
+    ('lance berkman', 99, 'spotlight'):
+        'f3ed2f8ef5616481987e95ce6cbb7e5c',
+    ('mike trout', 99, 'awards'):
+        'e84d5fa03896ff54cdadabf5d2ca8a7b',
+    ('ozzie albies', 98, '2026 all star'):
+        '6bca0765db76ea057be8289cf7bb0af2',
+    ('max muncy', 92, 'cityscapes'):
+        '5fe05e1065c026ec88edd48e841c80a7',
+    ('dustin may', 99, 'new threads'):
+        '0136a957b1243dcd640122b066a34aa7',
+    ('adley rutschman', 99, 'new threads'):
+        '095405569042bf08e28ca0c411eac121',
+    ('jose ramirez', 95, 'mural'):
+        '56c113bcf0449e4c45679da6a9f521de',
+}
+
+LEGACY_CARD_ART = {
+    ('manny ramirez', 94): 'f5e8e6d59d01a65fa1a76fe3bc41d753',
+    ('carlos beltran', 92): 'ae298137b980fa4713aa235891188659',
+    ('luis lara', 96): 'b85163e6c27ffebaab0cfa52e6deb84d',
+    ('daniel schneemann', 90): 'c4b6a635bc56b98c94d77a9188b2087b',
+    ('ozzie albies', 89): '3b1a482628a2a10f81bb6e47b9ee4e2d',
+    ('chase headley', 88): '0725dd19ed80c6cff262389a69fa379e',
+    ('chase utley', 88): '16588688df24c071adf191b89717de13',
+    ('cam schlittler', 98): 'ebb513f936b81fb5910c21d7687cbcad',
+    ('anthony seigler', 67): '3675fe0474e7202d802666cb405a3ffa',
+    ('junior caminero', 87): '5f74a86f361c5124d1ef06cbabad638e',
+}
+
+
 def card_avatar(player, initials):
-    cards = {
-        ('manny ramirez', 94): 'f5e8e6d59d01a65fa1a76fe3bc41d753',
-        ('carlos beltran', 92): 'ae298137b980fa4713aa235891188659',
-        ('carlos beltrán', 92): 'ae298137b980fa4713aa235891188659',
-        ('luis lara', 96): 'b85163e6c27ffebaab0cfa52e6deb84d',
-        ('daniel schneemann', 90): 'c4b6a635bc56b98c94d77a9188b2087b',
-        ('ozzie albies', 89): '3b1a482628a2a10f81bb6e47b9ee4e2d',
-        ('chase headley', 88): '0725dd19ed80c6cff262389a69fa379e',
-        ('chase utley', 88): '16588688df24c071adf191b89717de13',
-        ('cam schlittler', 98): 'ebb513f936b81fb5910c21d7687cbcad',
-        ('anthony seigler', 67): '3675fe0474e7202d802666cb405a3ffa',
-        ('junior caminero', 87): '5f74a86f361c5124d1ef06cbabad638e',
-    }
-    key = (player['name'].strip().casefold(), int(player['ovr']))
-    card_id = cards.get(key)
+    name = text_key(player.get('name'))
+    try:
+        overall = int(player.get('ovr', 0))
+    except (TypeError, ValueError):
+        overall = 0
 
-    if not card_id:
-        return f'<div class="avatar">{html.escape(initials)}</div>'
+    series = text_key(player.get('series'))
+    version = text_key(player.get('version'))
 
-    url = f'https://cards.theshow.com/mlb26/{card_id}-baked-lg.webp'
+    card_id = (
+        CARD_ART.get((name, overall, series))
+        or CARD_ART.get((name, overall, version))
+        or LEGACY_CARD_ART.get((name, overall))
+    )
+
+    url = None
+
+    if card_id:
+        url = (
+            f'https://cards.theshow.com/mlb26/'
+            f'{card_id}-baked-lg.webp'
+        )
+    else:
+        saved_url = player.get('card_image_url')
+        if isinstance(saved_url, str):
+            saved_url = saved_url.strip()
+            parsed = urlsplit(saved_url)
+            if parsed.scheme == 'https' and parsed.netloc:
+                url = saved_url
+
+        if not url:
+            saved_id = player.get('card_uuid')
+            if (
+                isinstance(saved_id, str)
+                and re.fullmatch(r'[a-fA-F0-9]{32}', saved_id.strip())
+            ):
+                url = (
+                    'https://cards.theshow.com/mlb26/'
+                    + saved_id.strip()
+                    + '-baked-lg.webp'
+                )
+
+    if not url:
+        return (
+            '<div class="avatar">'
+            + html.escape(initials)
+            + '</div>'
+        )
+
     return (
         '<div class="card-art">'
         f'<span>{html.escape(initials)}</span>'
-        f'<img src="{url}" alt="{html.escape(player["name"], quote=True)}" '
+        f'<img src="{html.escape(url, quote=True)}" '
+        f'alt="{html.escape(player["name"], quote=True)}" '
+        'decoding="async" '
         'onerror="this.style.display=\'none\'">'
         '</div>'
     )
+
+
 def render(repo, f):
     players = repo.list('players', f['id'])
     lineup = sorted(
@@ -78,44 +158,64 @@ def render(repo, f):
 
     cards = []
     occupied = set()
-    for p in field_players:
-        position = 'SP' if pitcher and p['id'] == pitcher['id'] else p['position']
+
+    for player in field_players:
+        position = (
+            'SP'
+            if pitcher and player['id'] == pitcher['id']
+            else player['position']
+        )
+
         if position not in positions:
-            st.warning(p['name'] + ': no field slot for ' + position)
-            continue
-        if position in occupied:
             st.warning(
-                'More than one player is assigned to ' + position
-                + '. Check Roster Manager.'
+                player['name'] + ': no field slot for ' + position
             )
             continue
+
+        if position in occupied:
+            st.warning(
+                'More than one player is assigned to '
+                + position + '. Check Roster Manager.'
+            )
+            continue
+
         occupied.add(position)
         x, y = positions[position]
+
         initials = ''.join(
-            word[0] for word in p['name'].split()[:2]
+            word[0] for word in player['name'].split()[:2]
         ).upper()
         order = (
-            '#' + str(p['order']) + ' · '
-            if p['kind'] == 'hitter' else ''
+            '#' + str(player['order']) + ' · '
+            if player['kind'] == 'hitter' else ''
         )
-        primary = str(p.get('primary') or 'Unknown')
-        series = str(p.get('series') or 'Series not entered')
-        secondary = p.get('secondary') or []
+        primary = str(player.get('primary') or 'Unknown')
+        series = str(player.get('series') or 'Series not entered')
+        secondary = player.get('secondary') or []
+
         if position == 'DH' or position == primary:
             fit = 'primary'
         elif position in secondary:
             fit = 'secondary'
         else:
             fit = 'out-of-position'
+
         cards.append(
-            f'<div class="player {fit}" style="left:{x}%;top:{y}%">'
-            + card_avatar(p, initials)
+            f'<div class="player {fit}" '
+            f'style="left:{x}%;top:{y}%">'
+            + card_avatar(player, initials)
             + '<div class="player-info">'
-            + f'<div class="name">{html.escape(p["name"])}</div>'
-            + f'<div class="details">{order}{html.escape(primary)}'
-            + f' · {p["ovr"]} OVR</div>'
-            + f'<div class="version">{html.escape(series)}</div>'
-            + '</div></div>'
+            + '<div class="name">'
+            + html.escape(player['name'])
+            + '</div>'
+            + '<div class="details">'
+            + html.escape(order + primary)
+            + ' · '
+            + html.escape(str(player['ovr']))
+            + ' OVR</div>'
+            + '<div class="version">'
+            + html.escape(series)
+            + '</div></div></div>'
         )
 
     components.html(
@@ -143,47 +243,36 @@ def render(repo, f):
         .player {
             position:absolute;
             transform:translate(-50%,-50%);
-            width:170px;
-            padding:12px 8px 10px;
+            display:flex;
+            align-items:center;
+            gap:10px;
+            width:250px;
+            padding:0;
             box-sizing:border-box;
-            text-align:center;
-            background:linear-gradient(145deg,#203448f5,#08111ef5);
-            border:1px solid #7796aa;
-            border-top:3px solid #f9c74f;
-            border-radius:4px 18px 4px 18px;
-            box-shadow:0 12px 25px #0008, inset 0 1px 0 #ffffff20;
-            transition:transform .2s,box-shadow .2s;
+            text-align:left;
+            background:none;
+            border:none;
+            transition:transform .2s;
         }
         .player.primary {
             --position-glow:rgba(52,211,153,.35);
-            border-color:#62c99d;
         }
         .player.secondary {
             --position-glow:rgba(250,204,21,.35);
-            border-color:#d4b952;
         }
         .player.out-of-position {
             --position-glow:rgba(248,113,113,.35);
-            border-color:#d47777;
-        }
-        .player.primary,
-        .player.secondary,
-        .player.out-of-position {
-            box-shadow:0 12px 25px #0008,
-                       0 0 22px 5px var(--position-glow),
-                       inset 0 1px 0 #ffffff20;
         }
         .player:hover {
             transform:translate(-50%,-50%) scale(1.06);
-            box-shadow:0 15px 30px #000a,
-                       0 0 28px 7px var(--position-glow);
             z-index:5;
         }
         .avatar {
-            margin:0 auto 8px;
+            flex:0 0 44px;
             width:44px;
             height:44px;
             line-height:44px;
+            text-align:center;
             border-radius:12px;
             background:linear-gradient(145deg,#356d93,#142c46);
             border:1px solid #9db8ca;
@@ -193,15 +282,15 @@ def render(repo, f):
         }
         .card-art {
             position:relative;
-            width:58px;
-            height:80px;
-            margin:0 auto 8px;
+            flex:0 0 82px;
+            width:82px;
+            height:114px;
             display:grid;
             place-items:center;
-            background:#142c46;
             border-radius:5px;
-            overflow:hidden;
+            background:transparent;
             font-weight:bold;
+            box-shadow:0 0 18px 3px var(--position-glow);
         }
         .card-art img {
             position:absolute;
@@ -209,19 +298,22 @@ def render(repo, f):
             width:100%;
             height:100%;
             object-fit:contain;
-            background:#142c46;
+            border-radius:5px;
+            background:transparent;
         }
-        @media(max-width:600px) {
-            .card-art { width:40px; height:55px; }
+        .player-info {
+            flex:1;
+            min-width:0;
         }
         .name {
             font-size:14px;
             font-weight:800;
-            text-shadow:0 2px 3px #000;
+            line-height:1.25;
+            text-shadow:0 2px 4px #000,0 0 8px #000;
         }
         .details {
             display:inline-block;
-            margin-top:7px;
+            margin-top:6px;
             padding:4px 7px;
             border-radius:4px;
             background:#f9c74f;
@@ -234,65 +326,8 @@ def render(repo, f):
             color:#bfd2e0;
             font-size:10px;
             letter-spacing:1px;
-            text-transform:uppercase;
-        }
-        @media(max-width:600px) {
-            .player { width:100px; padding:7px 4px; }
-            .avatar {
-                width:30px; height:30px;
-                line-height:30px; font-size:13px;
-            }
-            .name { font-size:11px; }
-            .details,.version { font-size:9px; letter-spacing:0; }
-        }
-        @media(prefers-reduced-motion:reduce) {
-            .player { transition:none; }
-        }
-        .player {
-            display:flex;
-            align-items:center;
-            gap:10px;
-            width:250px;
-            padding:0;
-            background:none;
-            border:none;
-            border-radius:0;
-            box-shadow:none;
-            text-align:left;
-        }
-        .player.primary,
-        .player.secondary,
-        .player.out-of-position,
-        .player:hover {
-            box-shadow:none;
-        }
-        .player .card-art {
-            flex:0 0 82px;
-            width:82px;
-            height:114px;
-            margin:0;
-            background:transparent;
-            overflow:visible;
-            box-shadow:0 0 18px 3px var(--position-glow);
-        }
-        .card-art img {
-            background:transparent;
-            border-radius:5px;
-        }
-        .player-info {
-            flex:1;
-            min-width:0;
-        }
-        .player .name {
-            font-size:14px;
-            line-height:1.25;
-            text-shadow:0 2px 4px #000,0 0 8px #000;
-        }
-        .player .details {
-            margin-top:6px;
-        }
-        .player .version {
             line-height:1.35;
+            text-transform:uppercase;
             text-shadow:0 2px 4px #000,0 0 8px #000;
         }
         @media(max-width:600px) {
@@ -302,12 +337,26 @@ def render(repo, f):
                 width:100px;
                 text-align:center;
             }
-            .player .card-art {
+            .card-art {
                 flex:0 0 auto;
                 width:48px;
                 height:66px;
             }
-            .player .name { font-size:11px; }
+            .avatar {
+                flex:0 0 auto;
+                width:30px;
+                height:30px;
+                line-height:30px;
+                font-size:13px;
+            }
+            .name { font-size:11px; }
+            .details,.version {
+                font-size:9px;
+                letter-spacing:0;
+            }
+        }
+        @media(prefers-reduced-motion:reduce) {
+            .player { transition:none; }
         }
         </style>
         <div class="field">
@@ -371,7 +420,8 @@ def render(repo, f):
             <path d="M500 640 L60 235 M500 640 L940 235"
                   fill="none" stroke="#fff3dc" stroke-width="3"/>
             <circle cx="500" cy="440" r="24" fill="url(#dirt)"/>
-            <rect x="492" y="434" width="16" height="5" fill="#fff3dc"/>
+            <rect x="492" y="434" width="16" height="5"
+                  fill="#fff3dc"/>
             <circle cx="500" cy="630" r="39" fill="url(#dirt)"/>
 
             <g fill="#fff3dc">
@@ -397,6 +447,14 @@ def render(repo, f):
         height=670,
     )
 
+    ordered_players = sorted(
+        players,
+        key=lambda player: (
+            player.get('order', 99),
+            player['name'],
+        ),
+    )
+
     for area, title in [
         ('bench', 'Bench'),
         ('rotation', 'Starting rotation'),
@@ -405,15 +463,13 @@ def render(repo, f):
         st.subheader(title)
         table([
             {
-                'Player': p['name'],
-                'Position': p['position'],
-                'OVR': p['ovr'],
-                'Card': p['version'],
+                'Player': player['name'],
+                'Position': player['position'],
+                'OVR': player['ovr'],
+                'Card': player['version'],
             }
-            for p in sorted(
-                players, key=lambda item: (item.get('order', 99), item['name'])
-            )
-            if p['area'] == area
+            for player in ordered_players
+            if player['area'] == area
         ])
 
     st.page_link(
