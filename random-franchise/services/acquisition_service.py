@@ -7,6 +7,7 @@ from services.offseason_service import (
     resolve_move,
     trade_card_errors,
     _change_card,
+    is_bench_upgrade,
 )
 
 
@@ -21,7 +22,10 @@ def incoming_card_errors(repo, fid, move, card):
         )
     }
 
-    return trade_card_errors(repo, fid, move, outgoing, card)
+    errors = trade_card_errors(repo, fid, move, outgoing, card)
+    if is_bench_upgrade(move) and card.get('kind') != 'hitter':
+        errors.append('Bench Upgrade can only be used for hitters.')
+    return errors
 
 
 def resolve_banked_move(
@@ -141,6 +145,13 @@ def resolve_banked_move(
             if player['area'] not in ACTIVE_AREAS:
                 raise RuleError(
                     'Choose an active player for a same-player upgrade.'
+                )
+            if is_bench_upgrade(move) and (
+                player['area'] != 'bench' or player['kind'] != 'hitter'
+            ):
+                raise RuleError(
+                    'Bench Upgrade may only upgrade a hitter currently '
+                    'assigned to the bench.'
                 )
 
             if not isinstance(new_player, dict):
