@@ -69,6 +69,18 @@ def move_required(repo, move):
     return bool(move.get('critical'))
 
 
+def is_bench_upgrade(move):
+    """Recognize bench-only acquisitions, including already-banked rewards.
+
+    Older saves have no reward_area marker; identify them by saved wheel name.
+    """
+    if move.get('type') != 'acquire':
+        return False
+    if move.get('constraints', {}).get('reward_area') == 'bench':
+        return True
+    return str(move.get('description', '')).strip().casefold() == 'bench upgrade'
+
+
 def confirm_end(repo, fid):
     with repo.transaction():
         f = repo.get('franchises', fid)
@@ -908,6 +920,15 @@ def resolve_move(
                 )
                 if len(incoming) != quantity:
                     raise RuleError(f'Provide {quantity} incoming card(s).')
+                # New Bench Upgrade cards must be hitters. Existing-card
+                # acquisitions and same-player upgrades have this same guard
+                # in acquisition_service.py.
+                if is_bench_upgrade(move) and any(
+                    not isinstance(card, dict)
+                    or card.get('kind') != 'hitter'
+                    for card in incoming
+                ):
+                    raise RuleError('Bench Upgrade can only acquire hitters.')
                 for card in incoming:
                     add_player(repo, fid, card)
 
