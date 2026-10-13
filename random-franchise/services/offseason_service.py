@@ -11,6 +11,64 @@ from services.roster_validator import (
 from services.stat_engine import cold_bat_candidates
 
 
+
+def trade_policy(repo, move):
+    """Classify a saved trade using the original, audited wheel outcome.
+
+    Older trade rewards were mistakenly stored as critical=True. Do not
+    modify their audited spins or rely solely on that legacy flag.
+    """
+    if move.get('type') != 'trade':
+        return {
+            'required': bool(move.get('critical')),
+            'choose_outgoing': False,
+        }
+
+    constraints = move.get('constraints') or {}
+    spin_id = move.get('spin_id')
+    original_spin = repo.get('spins', spin_id) if spin_id else None
+    if original_spin:
+        title = original_spin.get('result', {}).get('text', '')
+        original_wheel = original_spin.get('wheel_id') or original_spin.get(
+            'job', {}
+        ).get('wheel_id')
+    else:
+        title = move.get('description', '').split(' · ', 1)[0]
+        original_wheel = None
+
+    title = title.strip().casefold()
+
+    # Elimination/meltdown consequences are always mandatory, even when a
+    # future custom wheel happens to reuse a reward's display label.
+    if original_wheel in ('elimination', 'meltdown'):
+        return {'required': True, 'choose_outgoing': False}
+
+    if title in ('trade opportunity', 'free trade'):
+        return {
+            'required': False,
+            'choose_outgoing': title == 'free trade',
+        }
+
+    # New banked records explicitly preserve these details in constraints.
+    if constraints.get('optional_trade') is True:
+        return {
+            'required': False,
+            'choose_outgoing': bool(constraints.get('choose_outgoing')),
+        }
+
+    return {
+        'required': bool(move.get('critical')),
+        'choose_outgoing': False,
+    }
+
+
+def move_required(repo, move):
+    """Return the effective required status, including legacy trade rewards."""
+    if move.get('type') == 'trade':
+        return trade_policy(repo, move)['required']
+    return bool(move.get('critical'))
+
+
 def confirm_end(repo, fid):
     with repo.transaction():
         f = repo.get('franchises', fid)
@@ -188,7 +246,7 @@ def progress(repo, fid):
         elif f['state'] == State.MOVES:
             _require_cold_bat_review(repo, fid, run)
             if any(
-                m['status'] == 'pending' and m.get('critical')
+                m['status'] == 'pending' and move_required(repo, m)
                 for m in repo.list('moves', fid)
             ):
                 raise RuleError(
@@ -555,7 +613,7 @@ def resolve_move(
         before = dict(move)
 
         if action in ['deferred', 'canceled']:
-            if move.get('critical') and move['type'] != 'tag':
+            if move_required(repo, move) and move['type'] != 'tag':
                 raise RuleError(
                     'Critical consequences must be applied; '
                     'they cannot be skipped.'
@@ -563,12 +621,16 @@ def resolve_move(
             move.update(status=action, critical=False)
 
         elif action == 'resolved':
+            trade_rules = trade_policy(repo, move) if move['type'] == 'trade' else None
+            if trade_rules and trade_rules['choose_outgoing'] and not target_id:
+                raise RuleError('Choose the outgoing player for Free Trade.')
             pid = target_id or move.get('target')
 
             if (
                 move['type'] in ['dfa', 'demote', 'trade']
                 and move.get('target')
                 and pid != move['target']
+                and not (trade_rules and trade_rules['choose_outgoing'])
             ):
                 original = repo.get('players', move['target'])
                 if (
