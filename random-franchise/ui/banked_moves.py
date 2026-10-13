@@ -5,7 +5,7 @@ import streamlit as st
 
 from models.domain import State, RuleError, POSITIONS, ACTIVE_AREAS
 from services.offseason_service import (
-    trade_card_errors, trade_policy, move_required,
+    trade_card_errors, trade_policy, move_required, is_bench_upgrade,
 )
 from services.acquisition_service import (
     resolve_banked_move as resolve_move,
@@ -188,7 +188,7 @@ def template(move, player=None, changing=False):
     )
 
 
-def card_fields(seed, key, changing=False):
+def card_fields(seed, key, changing=False, forced_kind=None):
     positions = sorted(POSITIONS)
     a, b = st.columns(2)
 
@@ -204,9 +204,9 @@ def card_fields(seed, key, changing=False):
     kind = b.selectbox(
         'Player type',
         kind_options,
-        index=kind_options.index(seed.get('kind', 'hitter')),
+        index=kind_options.index(forced_kind or seed.get('kind', 'hitter')),
         key=key + ':kind',
-        disabled=changing,
+        disabled=changing or forced_kind is not None,
     )
 
     a, b = st.columns(2)
@@ -432,6 +432,7 @@ def review_lines(move, payload, players, moves, removal_pool):
         ]
 
     if kind == 'acquire':
+        is_bench = is_bench_upgrade(move)
         if payload['upgrade_player_id']:
             recipient = players[payload['upgrade_player_id']]
 
@@ -447,6 +448,9 @@ def review_lines(move, payload, players, moves, removal_pool):
 
             return [
                 incoming['name'] + ' → use existing Minors card',
+                'Keep the existing ID and stats. Arrange this hitter '
+                'on the bench in Roster Manager afterward.'
+                if is_bench else
                 'Keep the existing ID and stats. Arrange the '
                 'card in Roster Manager afterward.',
             ]
@@ -454,7 +458,10 @@ def review_lines(move, payload, players, moves, removal_pool):
         return [
             card['name'] + ' → Minors (new card)'
             for card in new
-        ]
+        ] + (
+            ['Arrange this hitter in a bench slot in Roster Manager.']
+            if is_bench else []
+        )
 
     if kind in ['dfa', 'demote']:
         quantity = move.get('constraints', {}).get('quantity', 1)
@@ -655,6 +662,7 @@ def render(repo, f):
     rules = move.get('constraints', {})
     original = by_id.get(move.get('target'))
     trade_rules = trade_policy(repo, move) if kind == 'trade' else None
+    bench_only = is_bench_upgrade(move)
 
     is_mvp = (
         kind == 'upgrade'
@@ -669,6 +677,13 @@ def render(repo, f):
     )
 
     show_rules(move)
+    if bench_only:
+        st.info(
+            'Bench Upgrade is a bench-only reward, not a trade. You can '
+            'choose an existing bench hitter to upgrade, or bring in one '
+            'Event-eligible hitter for your bench. The player saved by '
+            'the original spin is not a required recipient or removal.'
+        )
     if kind == 'trade' and not trade_rules['required']:
         st.info(
             'Optional trade reward: accept and apply it, save it for later, '
@@ -727,15 +742,22 @@ def render(repo, f):
             upgrade_ids = [
                 p['id']
                 for p in players
-                if p['area'] in ACTIVE_AREAS
-                and (
-                    not rules.get('kind')
-                    or p['kind'] == rules['kind']
+                if (
+                    (p['area'] == 'bench' and p['kind'] == 'hitter')
+                    if bench_only
+                    else (
+                        p['area'] in ACTIVE_AREAS
+                        and (
+                            not rules.get('kind')
+                            or p['kind'] == rules['kind']
+                        )
+                    )
                 )
             ]
 
             upgrade_pid = st.selectbox(
-                'Existing player to upgrade',
+                'Bench hitter to upgrade' if bench_only
+                else 'Existing player to upgrade',
                 [None] + upgrade_ids,
                 format_func=lambda i: labels.get(
                     i, 'Choose a player'
@@ -744,11 +766,19 @@ def render(repo, f):
             )
 
             st.caption(
+                'Choose a current bench hitter and switch to a higher-rated '
+                'Event-legal card of that same player. Their statistics stay.'
+                if bench_only else
                 'Use the same player’s higher-rated Event-legal card. '
                 'For a worst-position reward, select the player at '
                 'that position and explain your choice in the notes. '
                 'This consumes the acquisition reward.'
             )
+            if bench_only and not upgrade_ids:
+                st.warning(
+                    'No bench hitters are available for a card upgrade. '
+                    'You may use this reward to add a bench hitter instead.'
+                )
 
     target = None
 
@@ -834,9 +864,13 @@ def render(repo, f):
             key='target:' + mid,
         )
 
+    # Most acquisition spins record a random target even when the reward
+    # doesn't require one. Never present that random player as the recipient.
     selected = (
         by_id.get(upgrade_pid)
         if upgrade_pid
+        else None
+        if kind == 'acquire'
         else by_id.get(target) or (
             None if kind == 'trade' and trade_rules['choose_outgoing']
             else original
@@ -1058,7 +1092,11 @@ def render(repo, f):
 
             st.caption(
                 'Reuses the existing card and stats. '
-                'It stays in Minors until arranged.'
+                + (
+                    'Arrange the hitter into a bench slot in Roster Manager.'
+                    if bench_only else
+                    'It stays in Minors until arranged.'
+                )
             )
 
         acquire_upgrade = (
@@ -1082,6 +1120,8 @@ def render(repo, f):
             )
 
             seed = template(move, selected, changing)
+            if bench_only and not changing:
+                seed['kind'] = 'hitter'
 
             entry = st.radio(
                 'Card entry method',
@@ -1105,6 +1145,10 @@ def render(repo, f):
                             seed,
                             mid + ':card:' + str(index),
                             changing,
+                            forced_kind=(
+                                'hitter' if bench_only and not changing
+                                else None
+                            ),
                         )
                     )
 
@@ -1154,6 +1198,9 @@ def render(repo, f):
 
             else:
                 st.caption(
+                    'New cards enter Minors. Arrange the acquired hitter '
+                    'on the bench in Roster Manager.'
+                    if bench_only else
                     'New cards enter Minors. Arrange them '
                     'afterward in Roster Manager.'
                 )
