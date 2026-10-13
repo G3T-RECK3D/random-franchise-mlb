@@ -338,6 +338,12 @@ def available(repo, fid, job):
 
 
 def _choose_target(repo, fid, wedge, job):
+    # Bench Upgrade is not awarded to an arbitrary active player. The user
+    # chooses an eligible bench recipient (or bench signing) in offseason.
+    if (wedge.get('effect', 'acquire') == 'acquire'
+            and wedge.get('text', '').strip().casefold() == 'bench upgrade'):
+        return None
+
     if wedge.get('effect') in FIXED_REWARD_EFFECTS:
         return _fixed_reward_target(repo, fid, wedge, job)
 
@@ -401,6 +407,12 @@ def _bank(repo, fid, job, saved_spin, wedge, target):
         'quantity': wedge.get('quantity', 1),
     }
     description = wedge['text']
+
+    if kind == 'acquire' and description.strip().casefold() == 'bench upgrade':
+        # Explicit marker for future saves; the offseason service also
+        # recognizes older Bench Upgrade moves using their description.
+        constraints.update(reward_area='bench', kind='hitter')
+        target = None
 
     if kind in FIXED_REWARD_EFFECTS:
         if not target or target['franchise_id'] != fid:
