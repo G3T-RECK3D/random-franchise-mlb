@@ -452,7 +452,13 @@ def _bank(repo, fid, job, saved_spin, wedge, target):
         constraints=constraints,
         status='pending',
         critical=(
-            kind in ['dfa', 'demote', 'trade', 'tag']
+            kind in ['dfa', 'demote', 'tag']
+            or (kind == 'trade' and not (
+                (job['wheel_id'] == 'front_office' and
+                 wedge['text'].strip().casefold() == 'trade opportunity')
+                or (job['wheel_id'] == 'premium' and
+                    wedge['text'].strip().casefold() == 'free trade')
+            ))
             or kind in COLD_BAT_EFFECTS
         ),
         resolution_notes='',
@@ -531,6 +537,9 @@ def _bank_trade_result(repo, fid, saved_spin, context):
         'positions': list(context['positions']),
         'market_label': context['market_label'],
         'position_label': context['position_label'],
+        # The original trade wheel determines whether declining is allowed.
+        'optional_trade': not context.get('mandatory', True),
+        'choose_outgoing': context.get('choose_outgoing', False),
     }
     if context.get('max_ovr') is not None:
         constraints['max_ovr'] = context['max_ovr']
@@ -552,7 +561,7 @@ def _bank_trade_result(repo, fid, saved_spin, context):
         ),
         constraints=constraints,
         status='pending',
-        critical=True,
+        critical=context.get('mandatory', True),
         resolution_notes='',
     ))
 
@@ -657,9 +666,22 @@ def continue_spin(repo, fid, job_id, acknowledged=False):
                 ]
                 or job['wheel_id'] in ['elimination', 'meltdown']
             )
+            optional_reward = (
+                not forced
+                and (
+                    (job['wheel_id'] == 'front_office'
+                     and title == 'trade opportunity')
+                    or (job['wheel_id'] == 'premium'
+                        and title == 'free trade')
+                )
+            )
+            mandatory = not optional_reward
             context = {
                 'original_spin_id': saved_spin['id'],
                 'original_result': dict(wedge),
+                'original_wheel_id': job['wheel_id'],
+                'mandatory': mandatory,
+                'choose_outgoing': title == 'free trade',
                 'target': target['id'],
                 'kind': target['kind'],
                 'max_ovr': target['ovr'] if forced else None,
