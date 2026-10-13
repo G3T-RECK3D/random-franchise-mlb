@@ -4,7 +4,9 @@ import json
 import streamlit as st
 
 from models.domain import State, RuleError, POSITIONS, ACTIVE_AREAS
-from services.offseason_service import trade_card_errors
+from services.offseason_service import (
+    trade_card_errors, trade_policy, move_required,
+)
 from services.acquisition_service import (
     resolve_banked_move as resolve_move,
     incoming_card_errors,
@@ -380,10 +382,8 @@ def move_rows(moves, runs, games):
                 move['status'], move['status']
             ),
             'Required': (
-                'Yes'
-                if move.get('critical')
-                and move['status'] in ['pending', 'deferred']
-                else ''
+                'Yes' if move.get('display_required', move.get('critical'))
+                and move['status'] in ['pending', 'deferred'] else ''
             ),
         })
 
@@ -394,6 +394,14 @@ def review_lines(move, payload, players, moves, removal_pool):
     action = payload['action']
 
     if action != 'resolved':
+        if move['type'] == 'trade' and not move.get(
+            'display_required', move.get('critical')
+        ):
+            return [
+                'Keep the optional trade reward for later; no roster change.'
+                if action == 'deferred'
+                else 'Decline the optional trade; no roster change.'
+            ]
         return [
             'Save this move for later.'
             if action == 'deferred'
@@ -570,12 +578,17 @@ def render(repo, f):
     runs = {r['id']: r for r in repo.list('runs', fid)}
     games = {g['id']: g for g in repo.list('games', fid)}
 
+    # The original audited spin determines optional trade rewards. This
+    # also fixes legacy records mistakenly saved with critical=True.
+    for move in moves:
+        move['display_required'] = move_required(repo, move)
+
     pending = [
         m for m in moves
         if m['status'] in ['pending', 'deferred']
     ]
-    required = [m for m in pending if m.get('critical')]
-    optional = [m for m in pending if not m.get('critical')]
+    required = [m for m in pending if m['display_required']]
+    optional = [m for m in pending if not m['display_required']]
     finished = [
         m for m in moves
         if m['status'] not in ['pending', 'deferred']
@@ -632,7 +645,7 @@ def render(repo, f):
         'Move to resolve',
         list(choices),
         format_func=lambda i: (
-            'Required · ' if choices[i].get('critical') else ''
+            'Required · ' if choices[i]['display_required'] else 'Optional · '
         ) + choices[i]['description'],
         key='banked_move:' + fid,
     )
@@ -641,6 +654,7 @@ def render(repo, f):
     kind = move['type']
     rules = move.get('constraints', {})
     original = by_id.get(move.get('target'))
+    trade_rules = trade_policy(repo, move) if kind == 'trade' else None
 
     is_mvp = (
         kind == 'upgrade'
@@ -655,10 +669,15 @@ def render(repo, f):
     )
 
     show_rules(move)
+    if kind == 'trade' and not trade_rules['required']:
+        st.info(
+            'Optional trade reward: accept and apply it, save it for later, '
+            'or decline it without changing your roster.'
+        )
 
     actions = (
         ['resolved']
-        if move.get('critical') and kind != 'tag'
+        if move['display_required'] and kind != 'tag'
         else ['resolved', 'deferred', 'canceled']
     )
 
@@ -666,9 +685,16 @@ def render(repo, f):
         'Resolution',
         actions,
         format_func=lambda a: {
-            'resolved': 'Apply move',
+            'resolved': (
+                'Accept and apply trade'
+                if kind == 'trade' and not trade_rules['required']
+                else 'Apply move'
+            ),
             'deferred': 'Save for later',
-            'canceled': 'Cancel move',
+            'canceled': (
+                'Decline trade' if kind == 'trade' and not trade_rules['required']
+                else 'Cancel move'
+            ),
         }[a],
         key='resolution:' + mid,
     )
@@ -733,24 +759,39 @@ def render(repo, f):
             st.warning('The selected player is unavailable.')
 
     elif kind in ['trade', 'dfa', 'demote']:
-        pool_ids = [
-            p['id'] for p in target_pool(repo, fid)
-        ]
+        pool_ids = [p['id'] for p in target_pool(repo, fid)]
 
-        if original and original['id'] in pool_ids:
+        if kind == 'trade' and trade_rules['choose_outgoing']:
+            # Trade-position wheel was spun using the kind of the original
+            # candidate, so keep that player type for existing reward spins.
+            trade_kind = rules.get('kind', original['kind'] if original else None)
+            pool_ids = [
+                pid for pid in pool_ids
+                if not trade_kind or by_id[pid]['kind'] == trade_kind
+            ]
+            if action == 'resolved':
+                target = st.selectbox(
+                    'Choose the outgoing player (Free Trade)',
+                    [None] + pool_ids,
+                    format_func=lambda i: labels.get(i, 'Choose a player'),
+                    key='free_trade_target:' + mid,
+                )
+                st.caption(
+                    'Choose any eligible unprotected player of the type '
+                    'used for the original trade spin (hitter or pitcher). '
+                    'The incoming team and position spins still apply.'
+                )
+        elif original and original['id'] in pool_ids:
             target = original['id']
             st.caption(
                 'The outgoing player is fixed '
                 'by the audited wheel result.'
             )
-
-        else:
+        elif action == 'resolved':
             target = st.selectbox(
                 'Outgoing / removal target',
                 [None] + pool_ids,
-                format_func=lambda i: labels.get(
-                    i, 'Choose a player'
-                ),
+                format_func=lambda i: labels.get(i, 'Choose a player'),
                 key='target:' + mid,
             )
 
@@ -796,7 +837,10 @@ def render(repo, f):
     selected = (
         by_id.get(upgrade_pid)
         if upgrade_pid
-        else by_id.get(target) or original
+        else by_id.get(target) or (
+            None if kind == 'trade' and trade_rules['choose_outgoing']
+            else original
+        )
     )
 
     replacement = None
@@ -825,6 +869,7 @@ def render(repo, f):
             if m.get('run_id') == move.get('run_id')
             and m['status'] == 'pending'
             and m['type'] in allowed
+            and move_required(repo, m)
         }
 
         cancel_id = st.selectbox(
